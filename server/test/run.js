@@ -143,6 +143,15 @@ function initData(user, ageSec = 0, extra = {}) {
   const big = await fetch(base + '/api/products', { method: 'POST', headers: { 'x-init-data': initData(KAROLINA), 'content-type': 'application/json' }, body: 'x'.repeat(70000) }).catch(() => ({ status: 413 }));
   assert.equal(big.status, 413); ok('слишком большой запрос — 413');
 
+  // 8. несколько мостов: первый мёртв — работает второй
+  const { makeTg } = require('../src/tg');
+  const dead = 'http://127.0.0.1:1';
+  const tA = makeTg({ BOT_TOKEN: TOKEN, TG_API_ROOT: dead + ',' + S.cfg.TG_API_ROOT, TG_RELAY_KEY: 'wrong,' + RELAY_KEY }, () => {});
+  const sentBefore = sent.length;
+  const rr = await tA.call('sendMessage', { chat_id: 101, text: 'через второй мост' });
+  assert.equal(rr.ok, true); assert.equal(sent.length, sentBefore + 1); ok('первый мост недоступен — сообщение ушло через второй');
+  const tB = makeTg({ BOT_TOKEN: TOKEN, TG_API_ROOT: S.cfg.TG_API_ROOT + ',' + dead, TG_RELAY_KEY: RELAY_KEY }, () => {});
+  assert.equal((await tB.call('getMe', {})).ok, true); ok('один общий ключ на все мосты');
   console.log(`\nВсе ${n} проверок прошли`);
   process.exit(0);
 })().catch((e) => { console.error('ПРОВАЛ:', e); process.exit(1); });
