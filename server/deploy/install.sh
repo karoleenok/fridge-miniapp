@@ -68,25 +68,13 @@ say "4/8 Токен и адрес"
 if [ -f "$ENVF" ]; then
   warn "Настройки уже есть ($ENVF), использую их."
 else
-  BOT_TOKEN=$(asks "Токен бота Фриджа из @BotFather (не отображается при вводе):")
-  printf '%s' "$BOT_TOKEN" | grep -qE '^[0-9]+:[A-Za-z0-9_-]{30,}$' || die "Это не похоже на токен бота. Запусти заново."
-  # проверяем токен до записи
-  if [ -n "$TG_API_ROOT" ]; then ME=""
-    IFS=',' read -r -a RR <<< "$TG_API_ROOT"; IFS=',' read -r -a KK <<< "$TG_RELAY_KEY"
-    for i in "${!RR[@]}"; do K=${KK[$i]:-${KK[0]:-}}
-      ME=$(curl -s -m 20 -H "x-relay-key: $K" -H 'content-type: application/json' -d '{}' "${RR[$i]%/}/bot$BOT_TOKEN/getMe" || true)
-      printf '%s' "$ME" | grep -q '"ok":true' && break
-    done
-  else ME=$(curl -s -m 20 "https://api.telegram.org/bot$BOT_TOKEN/getMe" || true); fi
-  BOT_USERNAME=$(printf '%s' "$ME" | grep -o '"username":"[^"]*"' | head -1 | cut -d'"' -f4)
-  [ -n "$BOT_USERNAME" ] || warn "Не смог проверить токен (Telegram не ответил). Продолжаю; проверь бота после установки."
-  [ -n "$BOT_USERNAME" ] && ok "бот @$BOT_USERNAME"
+  # Токен в консоли не спрашиваем: его вставляют на одноразовой странице /claim (в обычном браузере, с копированием).
+  BOT_TOKEN=""; BOT_USERNAME=""
+  CLAIM_CODE=$(openssl rand -hex 4); CLAIM_UNTIL=$(( ($(date +%s) + 3600) * 1000 ))
   IP=$(curl -4 -s -m 8 https://ifconfig.me || hostname -I | awk '{print $1}')
   DOM=$(ask "Свой домен для Фриджа (Enter — бесплатный адрес):")
   [ -n "$DOM" ] || DOM="fridge.$(printf '%s' "$IP" | tr . -).sslip.io"
-  OWNER_INFO=$(ask "Кто оператор данных для политики (например «Самозанятая Беликова К., ИНН …»; Enter — заполнить позже):")
-  CONTACT=$(ask "Контакт для обращений по данным (почта или @ник; Enter — позже):")
-  OWNER_INFO=${OWNER_INFO//\"/}; CONTACT=${CONTACT//\"/}
+  OWNER_INFO=""; CONTACT=""   # данные оператора для /policy дописываются позже в /etc/fridge-bot.env
   umask 077
   cat > "$ENVF" <<EOT
 BOT_TOKEN=$BOT_TOKEN
@@ -103,9 +91,11 @@ HOST=127.0.0.1
 TZ_NAME=Europe/Moscow
 OWNER_INFO="$OWNER_INFO"
 CONTACT="$CONTACT"
+CLAIM_CODE=$CLAIM_CODE
+CLAIM_UNTIL=$CLAIM_UNTIL
 EOT
   chmod 600 "$ENVF"
-  unset BOT_TOKEN TG_RELAY_KEY
+  unset TG_RELAY_KEY
 fi
 set -a; . "$ENVF"; set +a
 DOM=${PUBLIC_URL#https://}
@@ -169,13 +159,26 @@ say "7/8 Проверка снаружи"
 for i in $(seq 1 30); do curl -fsS -m 5 "$PUBLIC_URL/health" >/dev/null 2>&1 && break; sleep 3; done
 curl -fsS -m 5 "$PUBLIC_URL/health" >/dev/null 2>&1 && ok "$PUBLIC_URL открывается с сертификатом" || warn "адрес пока не открылся (сертификат ещё выпускается). Подожди минуту."
 
-say "8/8 Переключить кнопку «Холодильник» в боте на этот сервер?"
-echo "  Сейчас кнопка открывает демо на GitHub. После «да» откроется настоящий Фридж с базой."
-if yes "$(ask 'Переключить? [да/нет]:')"; then
-  curl -fsS -m 60 "http://127.0.0.1:$PORT/setup?key=$SETUP_KEY" || warn "не получилось, повтори позже: bash $APP/server/deploy/switch.sh"
-  echo; ok "готово"
+if [ ! -s "$DATA/bot-token" ] && [ -z "${BOT_TOKEN:-}" ]; then
+  say "8/8 Токен бота: вставь его на одноразовой странице"
+  set -a; . "$ENVF"; set +a
+  printf '\n  Открой на телефоне или компьютере:\n\n      \033[1m%s/claim\033[0m\n\n  Код:  \033[1m%s\033[0m   (действует час)\n\n' "$PUBLIC_URL" "$CLAIM_CODE"
+  echo "  Там же вставь токен из @BotFather и нажми «Сохранить». Жду…"
+  for i in $(seq 1 720); do
+    curl -fsS -m 3 "http://127.0.0.1:$PORT/health" 2>/dev/null | grep -q waiting-token || break
+    sleep 5
+  done
+  if curl -fsS -m 3 "http://127.0.0.1:$PORT/health" 2>/dev/null | grep -q waiting-token; then
+    warn "Токен так и не вставлен. Новый код: bash $APP/server/deploy/claim.sh"
+  else
+    ok "токен получен, бот работает"
+  fi
 else
-  warn "Не переключал. Когда будешь готова: bash $APP/server/deploy/switch.sh"
+  say "8/8 Переключить кнопку «Холодильник» в боте на этот сервер?"
+  if yes "$(ask 'Переключить? [да/нет]:')"; then
+    curl -fsS -m 60 "http://127.0.0.1:$PORT/setup?key=$SETUP_KEY" || warn "не получилось, повтори позже: bash $APP/server/deploy/switch.sh"
+    echo; ok "готово"
+  fi
 fi
 
 cat <<EOT
