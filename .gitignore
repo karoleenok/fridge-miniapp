@@ -1,0 +1,4 @@
+server/data/
+server/test/shots/
+server/test/e2e.db*
+node_modules/
