@@ -8,6 +8,7 @@ const crypto = require('node:crypto');
 const { open } = require('./db');
 const { makeTg, enqueue, flush } = require('./tg');
 const C = require('./core');
+const { loadToken, makeClaim } = require('./claim');
 
 const cfg = {
   BOT_TOKEN: process.env.BOT_TOKEN || '',
@@ -25,7 +26,7 @@ const cfg = {
   CONTACT: process.env.CONTACT || '',
   BOT_USERNAME: process.env.BOT_USERNAME || ''
 };
-if (!cfg.BOT_TOKEN && !process.env.FRIDGE_TEST) { console.error('Нет BOT_TOKEN'); process.exit(1); }
+cfg.BOT_TOKEN = loadToken(cfg); // из переменной окружения или из файла, сохранённого одноразовой страницей /claim
 
 const db = open(cfg.DB_FILE);
 const log = (...a) => console.log(new Date().toISOString(), ...a);
@@ -298,9 +299,30 @@ function loadApp() {
 }
 loadApp();
 
+async function doSetup() {
+  const out = [];
+  if (cfg.MODE === 'webhook') out.push(await tg.call('setWebhook', { url: cfg.PUBLIC_URL + '/tg', secret_token: cfg.WEBHOOK_SECRET, allowed_updates: ['message', 'callback_query', 'my_chat_member'] }));
+  else out.push(await tg.call('deleteWebhook', {}));
+  out.push(await tg.call('setChatMenuButton', { menu_button: { type: 'web_app', text: 'Холодильник', web_app: { url: cfg.PUBLIC_URL } } }));
+  out.push(await tg.call('setMyCommands', { commands: [{ command: 'start', description: 'Открыть холодильник' }, { command: 'stop', description: 'Не присылать сообщения' }, { command: 'delete_me', description: 'Удалить мои данные' }] }));
+  return out.map((r) => (r.ok ? 'ок' : 'ошибка: ' + r.description)).join('\n');
+}
+
+const claim = makeClaim(cfg, async (token, username, switchMenu) => {
+  cfg.BOT_TOKEN = token;
+  if (username) botUsername = username;
+  startLoops();
+  if (switchMenu && cfg.PUBLIC_URL) log('setup:', (await doSetup()).replace(/\n/g, ', '));
+}, log);
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://x');
   try {
+    if (await claim.handle(req, res, url, send, readBody)) return;
+    if (!cfg.BOT_TOKEN) {
+      if (url.pathname === '/health') return send(res, 200, { ok: true, mode: 'waiting-token' });
+      return send(res, 503, '<!doctype html><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><p style="font:16px system-ui;padding:24px">Фридж ещё настраивается. Загляни через пару минут.</p>', 'text/html; charset=utf-8');
+    }
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
     if (req.method === 'GET' && (url.pathname === '/' || url.pathname === '/index.html'))
       return send(res, 200, appHtml, 'text/html; charset=utf-8', { 'content-security-policy': CSP });
@@ -314,12 +336,7 @@ const server = http.createServer(async (req, res) => {
       const key = url.searchParams.get('key') || '';
       if (!cfg.SETUP_KEY || key.length !== cfg.SETUP_KEY.length || !crypto.timingSafeEqual(Buffer.from(key), Buffer.from(cfg.SETUP_KEY)))
         return send(res, 403, 'forbidden', 'text/plain');
-      const out = [];
-      if (cfg.MODE === 'webhook') out.push(await tg.call('setWebhook', { url: cfg.PUBLIC_URL + '/tg', secret_token: cfg.WEBHOOK_SECRET, allowed_updates: ['message', 'callback_query', 'my_chat_member'] }));
-      else out.push(await tg.call('deleteWebhook', {}));
-      out.push(await tg.call('setChatMenuButton', { menu_button: { type: 'web_app', text: 'Холодильник', web_app: { url: cfg.PUBLIC_URL } } }));
-      out.push(await tg.call('setMyCommands', { commands: [{ command: 'start', description: 'Открыть холодильник' }, { command: 'stop', description: 'Не присылать сообщения' }, { command: 'delete_me', description: 'Удалить мои данные' }] }));
-      return send(res, 200, out.map((r) => (r.ok ? 'ок' : 'ошибка: ' + r.description)).join('\n'), 'text/plain; charset=utf-8');
+      return send(res, 200, await doSetup(), 'text/plain; charset=utf-8');
     }
     if (req.method === 'POST' && url.pathname === '/tg' && cfg.MODE === 'webhook') {
       const s = req.headers['x-telegram-bot-api-secret-token'] || '';
@@ -337,7 +354,10 @@ const server = http.createServer(async (req, res) => {
 });
 
 /* ---------- фоновые задачи ---------- */
+let started = false;
 function startLoops() {
+  if (started) return;
+  started = true;
   setInterval(() => { flush(db, tg).catch((e) => log('flush', e.message)); }, 5000);
   setInterval(() => { try { C.queueReminders(db, cfg); } catch (e) { log('reminders', e.message); } }, 60000);
   setInterval(() => { // уборка: отправленное старше 30 дней и использованные/просроченные приглашения
@@ -350,9 +370,10 @@ function startLoops() {
 if (require.main === module) {
   server.listen(cfg.PORT, cfg.HOST, async () => {
     log(`Фридж слушает ${cfg.HOST}:${cfg.PORT}, режим ${cfg.MODE}`);
+    if (!cfg.BOT_TOKEN) { log('жду токен на странице /claim'); return; }
     if (!botUsername) { const r = await tg.call('getMe', {}); if (r.ok) botUsername = r.result.username; }
     startLoops();
   });
 }
 
-module.exports = { server, db, cfg, onUpdate, startLoops, status, loadApp };
+module.exports = { server, db, cfg, onUpdate, startLoops, status, loadApp, claim };
