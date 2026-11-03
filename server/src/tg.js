@@ -3,26 +3,41 @@
 'use strict';
 
 function makeTg(cfg, log) {
-  const root = (cfg.TG_API_ROOT || 'https://api.telegram.org').replace(/\/+$/, '');
-  const headers = { 'content-type': 'application/json' };
-  if (cfg.TG_RELAY_KEY) headers['x-relay-key'] = cfg.TG_RELAY_KEY;
+  // Мостов может быть несколько: TG_API_ROOT="https://a,https://b", TG_RELAY_KEY="ключ_a,ключ_b" (или один общий ключ).
+  // Держимся за мост, который отвечает; при обрыве, таймауте или ошибке самого моста переходим на следующий.
+  const roots = String(cfg.TG_API_ROOT || 'https://api.telegram.org').split(',').map((s) => s.trim().replace(/\/+$/, '')).filter(Boolean);
+  const keys = String(cfg.TG_RELAY_KEY || '').split(',').map((s) => s.trim());
+  const keyOf = (i) => (keys.length > 1 ? keys[i] : keys[0]) || '';
+  let cur = 0;
 
-  async function call(method, body, timeoutMs = 15000) {
+  async function once(i, method, body, timeoutMs) {
     const ctl = new AbortController();
     const t = setTimeout(() => ctl.abort(), timeoutMs);
+    const headers = { 'content-type': 'application/json' };
+    if (keyOf(i)) headers['x-relay-key'] = keyOf(i);
     try {
-      const r = await fetch(`${root}/bot${cfg.BOT_TOKEN}/${method}`, {
-        method: 'POST', headers, body: JSON.stringify(body || {}), signal: ctl.signal
-      });
+      const r = await fetch(`${roots[i]}/bot${cfg.BOT_TOKEN}/${method}`, { method: 'POST', headers, body: JSON.stringify(body || {}), signal: ctl.signal });
       let j = null;
-      try { j = await r.json(); } catch (e) { /* мост мог вернуть не JSON */ }
-      if (!j) return { ok: false, error_code: r.status, description: 'bad response ' + r.status };
-      return j;
+      try { j = await r.json(); } catch (e) { /* мост вернул не JSON */ }
+      if (!j || typeof j.ok !== 'boolean') return { relayFail: true, res: { ok: false, error_code: r.status >= 500 ? r.status : 502, description: 'bridge ' + r.status } };
+      return { res: j };
     } catch (e) {
-      return { ok: false, error_code: 0, description: e.name === 'AbortError' ? 'timeout' : String(e.message || e) };
+      return { relayFail: true, res: { ok: false, error_code: 0, description: e.name === 'AbortError' ? 'timeout' : String(e.message || e) } };
     } finally { clearTimeout(t); }
   }
-  return { call, log };
+
+  async function call(method, body, timeoutMs = 15000) {
+    let last;
+    for (let a = 0; a < roots.length; a++) {
+      const i = (cur + a) % roots.length;
+      const r = await once(i, method, body, timeoutMs);
+      if (!r.relayFail) { if (a) { cur = i; log && log('мост', roots[i]); } return r.res; }
+      last = r.res;
+    }
+    if (roots.length > 1) cur = (cur + 1) % roots.length;
+    return last;
+  }
+  return { call, log, roots };
 }
 
 /* ---------- очередь отправки ---------- */
