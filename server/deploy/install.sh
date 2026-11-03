@@ -71,7 +71,12 @@ else
   BOT_TOKEN=$(asks "Токен бота Фриджа из @BotFather (не отображается при вводе):")
   printf '%s' "$BOT_TOKEN" | grep -qE '^[0-9]+:[A-Za-z0-9_-]{30,}$' || die "Это не похоже на токен бота. Запусти заново."
   # проверяем токен до записи
-  if [ -n "$TG_API_ROOT" ]; then ME=$(curl -s -m 20 -H "x-relay-key: $TG_RELAY_KEY" -H 'content-type: application/json' -d '{}' "$TG_API_ROOT/bot$BOT_TOKEN/getMe" || true)
+  if [ -n "$TG_API_ROOT" ]; then ME=""
+    IFS=',' read -r -a RR <<< "$TG_API_ROOT"; IFS=',' read -r -a KK <<< "$TG_RELAY_KEY"
+    for i in "${!RR[@]}"; do K=${KK[$i]:-${KK[0]:-}}
+      ME=$(curl -s -m 20 -H "x-relay-key: $K" -H 'content-type: application/json' -d '{}' "${RR[$i]%/}/bot$BOT_TOKEN/getMe" || true)
+      printf '%s' "$ME" | grep -q '"ok":true' && break
+    done
   else ME=$(curl -s -m 20 "https://api.telegram.org/bot$BOT_TOKEN/getMe" || true); fi
   BOT_USERNAME=$(printf '%s' "$ME" | grep -o '"username":"[^"]*"' | head -1 | cut -d'"' -f4)
   [ -n "$BOT_USERNAME" ] || warn "Не смог проверить токен (Telegram не ответил). Продолжаю; проверь бота после установки."
