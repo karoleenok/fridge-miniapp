@@ -20,7 +20,7 @@
   --fg:#0B0D12; --fg-2:#566074; --line:#0B0D12; --line-soft:#DDE3F1;
   --danger:#C42B33; --danger-bg:#FDEAEB; --warn:#8A4B00; --warn-bg:#FFF1D6; --warn-line:#E3A33A;
   --btn-bg:#0B0D12; --btn-fg:#FFFFFF; --danger-btn-bg:#C42B33; --danger-btn-fg:#FFFFFF;
-  --toast-bg:#0B0D12; --toast-fg:#FFFFFF; --toast-act:#A9C2FF; --focus:#2F5FD0; --scrim:rgba(8,10,15,.45);
+  --ask-bg:#F2F4F9;--ask-line:#C7CEDD;--ask-fg:#3B4457;--toast-bg:#0B0D12; --toast-fg:#FFFFFF; --toast-act:#A9C2FF; --focus:#2F5FD0; --scrim:rgba(8,10,15,.45);
 }
 :root[data-theme="dark"]{
   --bg:#0D1017; --bg-outer:#07090D; --tint:#1B2644; --tint-2:#2B3E73;
@@ -28,7 +28,7 @@
   --fg:#F2F5FB; --fg-2:#A3ABBD; --line:#F2F5FB; --line-soft:#262D3D;
   --danger:#FF8A90; --danger-bg:#3A1A1D; --warn:#FFC266; --warn-bg:#392A10; --warn-line:#8A6420;
   --btn-bg:#F2F5FB; --btn-fg:#0D1017; --danger-btn-bg:#FF8A90; --danger-btn-fg:#2A0A0C;
-  --toast-bg:#F2F5FB; --toast-fg:#0D1017; --toast-act:#2F5FD0; --focus:#9DB8FF; --scrim:rgba(0,0,0,.6);
+  --ask-bg:#1B2130;--ask-line:#3A4358;--ask-fg:#C4CCDD;--toast-bg:#F2F5FB; --toast-fg:#0D1017; --toast-act:#2F5FD0; --focus:#9DB8FF; --scrim:rgba(0,0,0,.6);
   color-scheme:dark}
 
 *{box-sizing:border-box}
@@ -42,7 +42,7 @@ svg{display:block;flex:none}
 :focus-visible{outline:3px solid var(--focus);outline-offset:2px;border-radius:12px}
 .gut{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
 
-.app{position:relative;height:100%;min-height:620px;max-width:460px;margin:0 auto;background:var(--bg);overflow:hidden}
+.app{position:relative;height:100%;max-width:460px;margin:0 auto;background:var(--bg);overflow:hidden}
 @media (min-width:520px){.app{border-left:1px solid var(--line-soft);border-right:1px solid var(--line-soft)}}
 .view{position:absolute;inset:0;display:flex;flex-direction:column;background:var(--bg)}
 
@@ -59,6 +59,7 @@ svg{display:block;flex:none}
 .iconbtn:active{background:var(--tint)}
 .pill{display:inline-flex;align-items:center;min-height:26px;padding:0 10px;border-radius:999px;border:1.5px solid var(--line-soft);font-size:13px;font-weight:600;white-space:nowrap;color:var(--fg-2)}
 .pill.bad{background:var(--danger-bg);border-color:var(--danger);color:var(--danger)}
+.pill.ask{background:var(--ask-bg);border-color:var(--ask-line);color:var(--ask-fg)}
 .pill.warn{background:var(--warn-bg);border-color:var(--warn-line);color:var(--warn)}
 .ico{display:grid;place-items:center;width:48px;height:48px;border-radius:16px;background:var(--tint);font-size:24px;line-height:1}
 .ico.lg{width:60px;height:60px;border-radius:20px;font-size:30px}
@@ -91,10 +92,20 @@ svg{display:block;flex:none}
 .ob-h.sm{font-size:clamp(22px,6.2vw,28px);margin-top:12px}
 .ob-sub{text-align:center;color:var(--fg-2);margin-top:8px;flex:none}
 .rev{flex:1;min-height:0;overflow-y:auto;padding-top:16px;padding-bottom:16px}
-.tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:10px}
+.tiles{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .tile{position:relative;min-height:92px;border-radius:20px;border:1.5px solid var(--line-soft);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;padding:8px;text-align:center;font-size:13px;font-weight:500;line-height:1.2}
 .tile .e{font-size:28px;line-height:1}
 .tile[aria-checked="true"]{background:var(--tint);border:2px solid var(--line);font-weight:600}
+.tile.other{border-style:dashed;border-color:var(--line)}
+.tile.other .e{font-size:30px;font-weight:300}
+.tile.other[aria-expanded="true"]{background:var(--tint);border-style:solid}
+.ob-h.sm{transition:none}
+@media (max-height:680px){.ob-h.sm{font-size:20px;margin-top:8px}.ob-sub{display:none}.ob-top{display:none}.ob2-head .tag{display:none}}
+#ob2.other-open .ob-sub{display:none}
+.other-box{flex:none;padding-top:12px;padding-bottom:4px;border-top:1px solid var(--line-soft)}
+.other-row{display:flex;gap:8px}
+.other-row .input{flex:1;min-width:0}
+.other-row .btn{flex:none;width:auto;min-height:52px}
 .tile .ck{position:absolute;top:6px;right:6px;width:22px;height:22px;border-radius:50%;background:var(--btn-bg);color:var(--btn-fg);display:none;place-items:center}
 .tile[aria-checked="true"] .ck{display:grid}
 .tile .ck svg{width:14px;height:14px;stroke-width:3}
@@ -237,7 +248,15 @@ select.input{width:auto;min-width:110px;appearance:auto}
 .scan .btn.primary{background:#fff;color:#0B0D12}
 .scan .btn.text{color:#A9C2FF}
 .input.need{border-color:var(--warn-line);background:var(--warn-bg)}
-.toast{position:absolute;left:50%;bottom:92px;transform:translateX(-50%);z-index:60;max-width:calc(100% - 32px);width:max-content;display:flex;align-items:center;gap:12px;padding:6px 8px 6px 18px;min-height:52px;border-radius:999px;background:var(--toast-bg);color:var(--toast-fg);font-size:14px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:fade .2s ease-out}
+.rowb{padding:12px 0;border-bottom:1px solid var(--line-soft)}
+.rh{display:grid;grid-template-columns:48px minmax(0,1fr) auto auto;gap:10px;align-items:center}
+.rh .rc{display:flex;flex-direction:column;min-width:0}
+.okmark{display:inline-grid;place-items:center;width:22px;height:22px;border-radius:50%;background:var(--btn-bg);color:var(--btn-fg);font-size:13px;font-weight:700}
+.dchips{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:10px}
+.dc{display:flex;align-items:center;justify-content:center;min-height:44px;padding:0 2px;border-radius:999px;border:1.5px solid var(--line-soft);font-weight:500;font-size:14px;background:var(--bg);white-space:nowrap}
+.dc[aria-pressed="true"]{background:var(--tint);border:2px solid var(--line);font-weight:600}
+.dinput{margin-top:10px}
+.toast{position:absolute;left:50%;bottom:152px;transform:translateX(-50%);z-index:60;max-width:calc(100% - 32px);width:max-content;display:flex;align-items:center;gap:12px;padding:6px 8px 6px 18px;min-height:52px;border-radius:999px;background:var(--toast-bg);color:var(--toast-fg);font-size:14px;font-weight:500;box-shadow:0 8px 24px rgba(0,0,0,.25);animation:fade .2s ease-out}
 .toast button{min-height:44px;padding:0 14px;font-weight:700;color:var(--toast-act);white-space:nowrap}
 .app.formopen .toast{bottom:auto;top:12px}
 @keyframes up{from{transform:translateY(40px);opacity:0}to{transform:none;opacity:1}}
@@ -270,8 +289,13 @@ select.input{width:auto;min-width:110px;appearance:auto}
       <span class="sp"></span>
     </div>
     <h1 class="ob-h sm gut">Отлично! А теперь давай проведём <em>ревизию</em> в холодильнике!</h1>
-    <p class="ob-sub gut">Отметь, что у тебя есть. Сроки подставлю сам, потом поправишь.</p>
+    <p class="ob-sub gut">Самое частое из российских корзин. Сроки укажешь следом, это минута.</p>
     <div class="rev gut"><div class="tiles" id="tiles" role="group" aria-label="Продукты для ревизии"></div></div>
+    <div class="other-box gut" id="otherBox" hidden>
+      <label for="otherName" class="lbl">Чего нет в списке?</label>
+      <div class="other-row"><input class="input" id="otherName" type="text" maxlength="40" autocomplete="off" autocapitalize="sentences" enterkeyhint="done" placeholder="Например, хумус"><button class="btn primary sm" data-act="rev-other-add">Добавить</button></div>
+      <p class="hint" id="otherHint" role="status"></p>
+    </div>
     <div class="ob-foot gut" style="border-top:1px solid var(--line-soft);padding-top:12px">
       <button class="btn primary" id="revCta" data-act="ob-done">Пропустить</button>
     </div>
@@ -392,6 +416,20 @@ select.input{width:auto;min-width:110px;appearance:auto}
     </footer>
   </section>
 
+  <section class="screen" id="dates" role="dialog" aria-modal="true" aria-labelledby="datesTitle" hidden>
+    <header class="bar gut">
+      <button class="iconbtn" data-act="close-dates" aria-label="Закрыть"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <h2 id="datesTitle" tabindex="-1" style="flex:1">Укажи срок</h2>
+      <span class="mt" id="dCount" aria-live="polite"></span>
+    </header>
+    <p class="mt gut" style="padding-bottom:4px;white-space:normal">Смотри дату на упаковке. Потом её можно поменять.</p>
+    <div class="fbody gut" id="dBody" style="gap:0"><div id="dList"></div></div>
+    <footer class="foot gut">
+      <button class="btn primary" id="dDone" data-act="close-dates"></button>
+      <p class="hint" id="dNote" style="text-align:center;margin-top:4px">Другой срок: значок календаря. Остальное можно позже.</p>
+    </footer>
+  </section>
+
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 </div>
 
@@ -408,7 +446,7 @@ var today=function(){var d=new Date();return new Date(d.getFullYear(),d.getMonth
 var iso=function(d){return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0')};
 var parse=function(s){var a=s.split('-').map(Number);return new Date(a[0],a[1]-1,a[2])};
 var addDays=function(n){var d=today();d.setDate(d.getDate()+n);return iso(d)};
-var left=function(p){return Math.round((parse(p.exp)-today())/DAY)};
+var left=function(p){return p.exp?Math.round((parse(p.exp)-today())/DAY):99999};
 var fmt=function(s){return parse(s).toLocaleDateString('ru-RU',{day:'numeric',month:'short'}).replace('.','')};
 var fmtLong=function(s){return parse(s).toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'})};
 var fmtQty=function(q){return String(Math.round(q*10)/10).replace('.',',')};
@@ -443,7 +481,7 @@ var DICT=[
  {n:'Салат',e:'🥬',c:'veg',d:4,u:'уп',q:1},{n:'Брокколи',e:'🥦',c:'veg',d:7,u:'шт',q:1},
  {n:'Грибы',e:'🍄',c:'veg',d:5,u:'г',q:300},{n:'Ягоды',e:'🍓',c:'veg',d:3,u:'г',q:250},
  {n:'Борщ',e:'🍲',c:'ready',d:3,u:'л',q:1},{n:'Суп',e:'🍲',c:'ready',d:3,u:'л',q:1},
- {n:'Пицца',e:'🍕',c:'ready',d:3,u:'шт',q:2},
+ {n:'Пицца',e:'🍕',c:'ready',d:3,u:'шт',q:2},{n:'Готовая еда',e:'🍱',c:'ready',d:3,u:'шт',q:1},
  {n:'Сок',e:'🧃',c:'drink',d:10,u:'л',q:1},
  {n:'Соевый соус',e:'🥫',c:'sauce',d:90,u:'мл',q:150},{n:'Кетчуп',e:'🥫',c:'sauce',d:60,u:'мл',q:300},
  {n:'Майонез',e:'🥫',c:'sauce',d:60,u:'мл',q:200},
@@ -451,7 +489,7 @@ var DICT=[
 ];
 var byName=function(n){return DICT.filter(function(x){return x.n===n})[0]};
 var POPULAR=['Молоко','Яйца','Куриное филе','Сыр','Огурцы','Йогурт','Зелень'];
-var REVISION=['Молоко','Яйца','Сыр','Йогурт','Сливочное масло','Куриное филе','Колбаса','Огурцы','Помидоры','Зелень','Яблоки','Сок'];
+var REVISION=['Молоко','Яйца','Сметана','Сыр','Куриное филе','Колбаса','Рыба','Огурцы','Помидоры','Лимон','Зелень','Майонез','Кетчуп','Готовая еда','Йогурт','Творог','Кефир'];
 var norm=function(s){return s.toLowerCase().replace(/ё/g,'е').trim()};
 var mkToken=function(){var a='ABCDEFGHJKLMNPQRSTUVWXYZ23456789',t='';for(var i=0;i<6;i++)t+=a[Math.floor(Math.random()*a.length)];return t};
 
@@ -459,7 +497,7 @@ var state={
   view:'ob1',tab:'products',filter:'all',group:'date',products:[],nextId:1,
   fridge:'Наш холодильник',
   members:[{id:'me',name:'Вы',role:'owner',tone:0},{id:'masha',name:'Маша',role:'member',tone:1},{id:'anton',name:'Антон',role:'member',tone:2}],
-  pending:false,token:mkToken(),memo:{},
+  pending:false,token:mkToken(),memo:{},custom:[],customMap:{},otherOpen:false,
   notify:{on:true,days:3,time:'09:00',who:'all'},
   rev:{},openId:null,undo:null,lastFocus:null
 };
@@ -496,6 +534,7 @@ function renderAll(){renderProducts();renderFamily();renderNotify();setTab(state
 
 /* ---------- продукты ---------- */
 function badge(p){
+  if(!p.exp)return {cls:'ask',t:'срок?',sub:''};
   var d=left(p),N=state.notify.days,sub='до '+fmt(p.exp);
   if(d<0)return {cls:'bad',t:'просрочено',sub:sub};
   if(d===0)return {cls:'warn',t:'сегодня',sub:sub};
@@ -523,7 +562,10 @@ function renderProducts(){
   var over=P.filter(function(p){return left(p)<0}).length;
   var hero=$('#hero');
   if(!P.length){hero.hidden=true}else{hero.hidden=false}
-  if(urgent.length){
+  var nodate=P.filter(function(p){return !p.exp}).length;
+  if(nodate){
+    hero.innerHTML='<div class="txt"><div class="big">'+nodate+'</div><div class="lbl">'+plural(nodate,'продукт','продукта','продуктов')+' без срока</div><div class="who">Пока сроков нет, напоминать не смогу'+(urgent.length?'. Скоро испортятся ещё '+urgent.length:'')+'</div><button class="btn primary sm go" data-act="open-dates">Указать за минуту</button></div>';
+  }else if(urgent.length){
     var names=urgent.slice(0,3).map(function(p){return p.name.split(',')[0]}).join(', ')+(urgent.length>3?' и ещё '+(urgent.length-3):'');
     hero.innerHTML='<div class="txt"><div class="big">'+urgent.length+'</div><div class="lbl">'+plural(urgent.length,'продукт','продукта','продуктов')+' на контроле</div><div class="who">'+(over?over+' уже просрочено. ':'')+esc(names)+'</div><button class="btn primary sm go" data-act="show-soon">Показать</button></div>';
   }else if(P.length){
@@ -531,9 +573,10 @@ function renderProducts(){
   }
 
   var cnt={};P.forEach(function(p){cnt[p.c]=(cnt[p.c]||0)+1});
-  if(state.filter!=='all'&&state.filter!=='soon'&&!cnt[state.filter])state.filter='all';
+  if(state.filter!=='all'&&state.filter!=='soon'&&state.filter!=='nodate'&&!cnt[state.filter])state.filter='all';
   var chips='<button class="chip" data-act="filter" data-f="all" aria-pressed="'+(state.filter==='all')+'">Все <span class="n">'+P.length+'</span></button>'+
    '<button class="chip" data-act="filter" data-f="soon" aria-pressed="'+(state.filter==='soon')+'">Скоро <span class="n">'+urgent.length+'</span></button>';
+  if(nodate)chips+='<button class="chip" data-act="filter" data-f="nodate" aria-pressed="'+(state.filter==='nodate')+'">Без срока <span class="n">'+nodate+'</span></button>';
   CATS.forEach(function(c){if(cnt[c.id])chips+='<button class="chip" data-act="filter" data-f="'+c.id+'" aria-pressed="'+(state.filter===c.id)+'">'+c.s+' <span class="n">'+cnt[c.id]+'</span></button>'});
   $('#chipRow').innerHTML=P.length?chips:'';
   $('#chipRow').hidden=!P.length;
@@ -543,6 +586,7 @@ function renderProducts(){
   var shown=P.filter(function(p){
     if(state.filter==='all')return true;
     if(state.filter==='soon')return left(p)<=N;
+    if(state.filter==='nodate')return !p.exp;
     return p.c===state.filter;
   });
   $('#listTitle').innerHTML='Продукты <span>· '+shown.length+'</span>';
@@ -555,7 +599,8 @@ function renderProducts(){
   }else if(state.group==='date'){
     var g=[{k:'bad',t:'Просрочено',a:shown.filter(function(p){return left(p)<0})},
            {k:'warn',t:'Скоро испортится',a:shown.filter(function(p){var d=left(p);return d>=0&&d<=N})},
-           {k:'',t:'В порядке',a:shown.filter(function(p){return left(p)>N})}];
+           {k:'',t:'Без срока',a:shown.filter(function(p){return !p.exp})},
+           {k:'',t:'В порядке',a:shown.filter(function(p){return p.exp&&left(p)>N})}];
     g.forEach(function(s){if(s.a.length)out+='<div class="sec-h '+s.k+'"><span>'+s.t+'</span><span>'+s.a.length+'</span></div>'+sorted(s.a).map(function(p){return rowHTML(p,p.id===state.flashId)}).join('')});
   }else{
     CATS.forEach(function(c){var a=shown.filter(function(p){return p.c===c.id});if(a.length)out+='<div class="sec-h"><span>'+c.n+'</span><span>'+a.length+'</span></div>'+sorted(a).map(function(p){return rowHTML(p,p.id===state.flashId)}).join('')});
@@ -567,6 +612,7 @@ function renderProducts(){
 
 /* ---------- карточка продукта ---------- */
 function openSheet(html,focusSel){
+  $('#toast').hidden=true;
   state.lastFocus=document.activeElement;
   $('#sheet').innerHTML=html;$('#sheet').hidden=false;$('#scrim').hidden=false;
   $('#main').inert=true;
@@ -579,17 +625,17 @@ function closeSheet(){
 }
 function itemSheet(p){
   var b=badge(p),d=left(p),c=CAT(p.c),m=member(p.by)||{name:'Кто-то',tone:0};
-  var rest=d<0?'просрочено '+(d===-1?'вчера':daysWord(-d)+' назад'):d===0?'сегодня последний день':daysWord(d);
+  var rest=!p.exp?'срок не указан':d<0?'просрочено '+(d===-1?'вчера':daysWord(-d)+' назад'):d===0?'сегодня последний день':daysWord(d);
   var step=STEP[p.u]||1;
   openSheet('<div class="gut"><div class="grab"></div>'+
    '<div class="sh-head"><span class="ico lg" aria-hidden="true">'+esc(p.e)+'</span><div><h3 id="shTitle">'+esc(p.name)+'</h3><p>'+c.n+'</p></div><button class="iconbtn" data-act="close-sheet" aria-label="Закрыть"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>'+
    '<div class="facts">'+
-    '<div class="fact"><span class="k">Годен до</span><span class="v">'+esc(fmtLong(p.exp))+'</span></div>'+
+    '<div class="fact"><span class="k">Годен до</span><span class="v">'+(p.exp?esc(fmtLong(p.exp)):'не указан')+'</span></div>'+
     '<div class="fact"><span class="k">Осталось</span><span class="v '+(b.cls)+'">'+rest+'</span></div>'+
     '<div class="fact"><span class="k">Количество</span><span class="step"><button data-act="qty" data-d="-1" aria-label="Меньше">−</button><output id="shQty" aria-live="polite">'+fmtQty(p.q)+' '+p.u+'</output><button data-act="qty" data-d="1" aria-label="Больше">+</button></span></div>'+
     '<div class="fact"><span class="k">Добавил(а)</span><span class="v">'+avHTML(m,'sm')+esc(m.name)+' · '+fmt(p.added)+'</span></div>'+
    '</div>'+
-   '<div class="sh-actions"><button class="btn primary" data-act="eat">Съели</button><div class="two"><button class="btn outline" data-act="trash">Выбросили</button><button class="btn outline" data-act="edit">Изменить</button></div></div></div>',
+   (p.exp?'<div class="sh-actions"><button class="btn primary" data-act="eat">Съели</button><div class="two"><button class="btn outline" data-act="trash">Выбросили</button><button class="btn outline" data-act="edit">Изменить</button></div></div></div>':'<div class="sh-actions"><button class="btn primary" data-act="open-dates" data-id="'+p.id+'">Указать срок</button><div class="two"><button class="btn outline" data-act="eat">Съели</button><button class="btn outline" data-act="trash">Выбросили</button></div><button class="btn text" data-act="edit">Изменить название или количество</button></div></div>'),
    '#shTitle');
 }
 function findP(id){return state.products.filter(function(p){return p.id===Number(id)})[0]}
@@ -605,6 +651,44 @@ function removeProduct(id,how){
   var p=findP(id);if(!p)return;var idx=state.products.indexOf(p);
   state.products.splice(idx,1);closeSheet();renderProducts();renderNotify();
   toast(p.name.split(',')[0]+': '+(how==='eat'?'съели':'выбросили'),'Отменить',function(){state.products.splice(idx,0,p);renderProducts();renderNotify()});
+}
+
+/* ---------- экран «Укажи срок» ---------- */
+var dState={ids:[],custom:null};
+function openDates(id){
+  if(!$('#sheet').hidden)closeSheet();
+  state.lastFocus=document.activeElement;
+  dState.ids=id?[Number(id)]:state.products.filter(function(p){return !p.exp}).map(function(p){return p.id});
+  dState.custom=null;
+  if(!dState.ids.length)return;
+  $('#toast').hidden=true;  $('#dates').hidden=false;$('#main').inert=true;$('#app').classList.add('formopen');
+  renderDates();
+  var t=$('#datesTitle');if(t)t.focus({preventScroll:true});
+}
+function closeDates(){
+  var done=dState.ids.map(findP).filter(function(p){return p&&p.exp}).length;
+  $('#dates').hidden=true;$('#main').inert=!$('#form').hidden;if($('#form').hidden)$('#app').classList.remove('formopen');
+  renderProducts();renderNotify();
+  if(done)toast('Сроки указаны: '+done+'. Напомню заранее');
+  if(state.lastFocus&&document.contains(state.lastFocus)){try{state.lastFocus.focus({preventScroll:true})}catch(e){}}
+}
+function renderDates(){
+  var items=dState.ids.map(findP).filter(Boolean);
+  var done=items.filter(function(p){return p.exp}).length,total=items.length;
+  var body=$('#dBody'),st=body.scrollTop,fa=document.activeElement,fk=null;
+  if(fa&&fa.dataset&&fa.dataset.act&&fa.dataset.id)fk=[fa.dataset.act,fa.dataset.id,fa.dataset.d||''];
+  $('#dCount').textContent=done+' из '+total;
+  var days=[[1,'Завтра'],[3,'3 дня'],[7,'Неделя'],[30,'Месяц']];
+  $('#dList').innerHTML=items.map(function(p){
+    var chips=days.map(function(x){return '<button class="dc" data-act="dset" data-id="'+p.id+'" data-d="'+x[0]+'" aria-pressed="'+(p.exp===addDays(x[0]))+'">'+x[1]+'</button>'}).join('');
+    var sub=p.exp?'до '+fmt(p.exp):CAT(p.c).s;
+    var cust=dState.custom===p.id?'<input class="input dinput" type="date" id="dd'+p.id+'" data-date-for="'+p.id+'" value="'+(p.exp||'')+'" min="'+iso(today())+'" aria-label="Своя дата для '+esc(p.name)+'">':'';
+    return '<div class="rowb"><div class="rh"><span class="ico" aria-hidden="true">'+esc(p.e)+'</span><span class="rc"><span class="nm">'+esc(p.name)+'</span><span class="mt">'+sub+'</span></span>'+(p.exp?'<span class="okmark" aria-hidden="true">✓</span>':'<span></span>')+'<button class="iconbtn" data-act="dcustom" data-id="'+p.id+'" aria-label="Своя дата для '+esc(p.name)+'" aria-expanded="'+(dState.custom===p.id)+'"><svg class="ic" viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="15" rx="3"/><path d="M4 10h16M9 3v4M15 3v4"/></svg></button></div><div class="dchips" role="group" aria-label="Срок для '+esc(p.name)+'">'+chips+'</div>'+cust+'</div>';
+  }).join('');
+  $('#dDone').textContent=done===total?'Готово':'Готово · '+done+' из '+total;
+  $('#dNote').hidden=done===total;
+  body.scrollTop=st;
+  if(fk){var nf=$$('#dList [data-act="'+fk[0]+'"]').filter(function(b){return b.dataset.id===fk[1]&&(b.dataset.d||'')===fk[2]})[0];if(nf)nf.focus({preventScroll:true})}
 }
 
 /* ---------- форма ---------- */
@@ -708,10 +792,31 @@ function saveForm(again){
 }
 
 /* ---------- ревизия ---------- */
+function revEntry(n){return byName(n)||state.customMap[n]}
 function renderRev(){
-  $('#tiles').innerHTML=REVISION.map(function(n){var d=byName(n);var on=!!state.rev[n];
+  var names=REVISION.concat(state.custom);
+  var h=names.map(function(n){var d=revEntry(n);var on=!!state.rev[n];
     return '<button class="tile" role="checkbox" aria-checked="'+on+'" data-act="rev-toggle" data-n="'+esc(n)+'"><span class="ck"><svg class="ic" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></span><span class="e" aria-hidden="true">'+d.e+'</span>'+esc(n)+'</button>'}).join('');
+  h+='<button class="tile other" data-act="rev-other" aria-expanded="'+state.otherOpen+'" aria-controls="otherBox"><span class="e" aria-hidden="true">+</span>Другое</button>';
+  $('#tiles').innerHTML=h;
+  $('#otherBox').hidden=!state.otherOpen;$('#ob2').classList.toggle('other-open',state.otherOpen);
   updateRevCta();
+}
+function addCustom(){
+  var inp=$('#otherName'),hint=$('#otherHint');
+  var v=inp.value.trim().replace(/\s+/g,' ');
+  if(v.length<2){hint.className='err';hint.textContent='Напиши название, хотя бы пару букв.';inp.setAttribute('aria-invalid','true');inp.focus();return}
+  inp.removeAttribute('aria-invalid');
+  v=v.charAt(0).toUpperCase()+v.slice(1);
+  var dup=REVISION.concat(state.custom).filter(function(n){return norm(n)===norm(v)})[0];
+  if(dup){state.rev[dup]=true;inp.value='';hint.className='hint';hint.textContent='Это уже есть в списке, я отметил.';renderRev();$('#otherName').focus();return}
+  var m=findMatches(v)[0];
+  state.customMap[v]=m?{e:m.e,c:m.c,d:m.d,u:m.u,q:m.q}:{e:CAT('other').e,c:'other',d:7,u:'шт',q:1};
+  state.custom.push(v);state.rev[v]=true;
+  inp.value='';hint.className='hint';
+  hint.textContent=m?'Добавил. Срок взял типичный, поправишь после.':'Добавил в категорию «Другое» со сроком 7 дней. Поправишь после.';
+  renderRev();$('#otherName').focus();
+  var t=$('#tiles');t.parentNode.scrollTop=t.parentNode.scrollHeight;
 }
 function updateRevCta(){
   var n=Object.keys(state.rev).filter(function(k){return state.rev[k]}).length;
@@ -777,12 +882,18 @@ document.addEventListener('click',function(e){
    case 'ob-next':setView('ob2');break;
    case 'ob-back':setView('ob1');break;
    case 'ob-example':seed();state.rev={};setView('main');setTab('products');break;
+   case 'open-dates':openDates(el.dataset.id);break;
+   case 'close-dates':closeDates();break;
+   case 'dset':var dp=findP(id);if(dp){var tg=addDays(Number(el.dataset.d));dp.exp=(dp.exp===tg)?null:tg;renderDates()}break;
+   case 'dcustom':dState.custom=(dState.custom===Number(id))?null:Number(id);renderDates();if(dState.custom){var di=$('#dd'+id);if(di)di.focus()}break;
+   case 'rev-other':state.otherOpen=!state.otherOpen;renderRev();if(state.otherOpen){setTimeout(function(){var i=$('#otherName');if(i)i.focus()},60)}break;
+   case 'rev-other-add':addCustom();break;
    case 'rev-toggle':state.rev[el.dataset.n]=!state.rev[el.dataset.n];el.setAttribute('aria-checked',String(!!state.rev[el.dataset.n]));updateRevCta();break;
    case 'ob-done':
      state.products=[];
-     Object.keys(state.rev).filter(function(k){return state.rev[k]}).forEach(function(n){var d=byName(n);state.products.push({id:state.nextId++,name:d.n,e:d.e,c:d.c,exp:addDays(d.d),q:d.q,u:d.u,by:'me',added:iso(today())})});
-     var cnt=state.products.length;state.rev={};setView('main');setTab('products');
-     if(cnt)toast('Добавил '+cnt+'. Сроки примерные, сверь с упаковкой');break;
+     Object.keys(state.rev).filter(function(k){return state.rev[k]}).forEach(function(n){var d=revEntry(n);state.products.push({id:state.nextId++,name:n,e:d.e,c:d.c,exp:null,q:d.q,u:d.u,by:'me',added:iso(today())})});
+     var cnt=state.products.length;state.rev={};state.custom=[];state.customMap={};state.otherOpen=false;setView('main');setTab('products');
+     if(cnt)toast('Добавил '+cnt+'. Теперь укажи сроки');break;
    case 'tab':setTab(el.dataset.tab);break;
    case 'go-family':setTab('family');break;
    case 'filter':state.filter=el.dataset.f;renderProducts();break;
@@ -818,7 +929,7 @@ document.addEventListener('click',function(e){
    case 'notify-who':state.notify.who=el.dataset.v;renderNotify();break;
    case 'preview-open':state.filter='soon';renderProducts();setTab('products');break;
    case 'theme':userTheme=true;var rt=document.documentElement;rt.setAttribute('data-theme',rt.getAttribute('data-theme')==='dark'?'light':'dark');renderNotify();break;
-   case 'demo-welcome':state.rev={};setView('ob1');break;
+   case 'demo-welcome':state.rev={};state.custom=[];state.customMap={};state.otherOpen=false;setView('ob1');break;
    case 'demo-empty':state.products=[];state.filter='all';renderProducts();renderNotify();setTab('products');break;
    case 'demo-sample':seed();state.filter='all';renderProducts();renderNotify();setTab('products');break;
   }
@@ -828,11 +939,13 @@ document.addEventListener('input',function(e){
   if(e.target.id==='fridgeName'){state.fridge=e.target.value.trim()||'Наш холодильник';$('#fridgeTitle').textContent=state.fridge}
 });
 document.addEventListener('change',function(e){
+  if(e.target.dataset&&e.target.dataset.dateFor){var cp=findP(e.target.dataset.dateFor);if(cp){cp.exp=e.target.value||null;renderDates()}return}
   if(e.target.id==='fDate'&&form){form.exp=e.target.value;form.dateTouched=true;refreshForm()}
   if(e.target.id==='fUnit'&&form){form.u=e.target.value;form.qtyTouched=true;var s=STEP[form.u]||1;if(form.q<s)form.q=s;refreshForm()}
 });
 document.addEventListener('keydown',function(e){
-  if(e.key==='Escape'){if(!$('#sheet').hidden)closeSheet();else if(!$('#form').hidden)closeForm()}
+  if(e.key==='Escape'){if(!$('#dates').hidden)closeDates();else if(!$('#sheet').hidden)closeSheet();else if(!$('#form').hidden)closeForm()}
+  if(e.key==='Enter'&&e.target.id==='otherName'){e.preventDefault();addCustom();return}
   if(e.key==='Enter'&&e.target.id==='fName'&&form){e.preventDefault();var m=findMatches(form.name);if(m.length&&form.name.trim().length<3){applyEntry(m[0],true)}saveForm(false)}
 });
 
