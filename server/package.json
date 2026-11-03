@@ -1,0 +1,11 @@
+{
+  "name": "fridge-server",
+  "private": true,
+  "description": "Сервер Фриджа: мини-апп, API, Telegram-бот. Без внешних зависимостей, Node 22+.",
+  "scripts": {
+    "start": "node --no-warnings src/server.js",
+    "test": "node --no-warnings test/run.js",
+    "e2e": "node test/e2e.js"
+  },
+  "engines": { "node": ">=22.5" }
+}
