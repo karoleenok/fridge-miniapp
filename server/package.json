@@ -4,8 +4,10 @@
   "description": "Сервер Фриджа: мини-апп, API, Telegram-бот. Без внешних зависимостей, Node 22+.",
   "scripts": {
     "start": "node --no-warnings src/server.js",
-    "test": "node --no-warnings test/run.js",
-    "e2e": "node test/e2e.js"
+    "test": "node --no-warnings test/run.js && node --no-warnings test/features.js && node --no-warnings test/owner.js",
+    "e2e": "node --no-warnings test/e2e.js && node --no-warnings test/live_ui.js"
   },
-  "engines": { "node": ">=22.5" }
+  "engines": {
+    "node": ">=22.5"
+  }
 }
