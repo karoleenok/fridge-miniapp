@@ -187,7 +187,7 @@ function stateFor(db, uid) {
   return {
     me: { id: uid, name: displayName(db, uid), canDm: !!u.can_dm, onboarded: !!u.onboarded,
       newsRead: (() => { try { return JSON.parse(u.news_read || '[]'); } catch (e) { return []; } })(),
-      notify: { on: !!u.notify_on, days: u.notify_days, time: u.notify_time } },
+      notify: { on: !!u.notify_on, days: u.notify_days, time: u.notify_time, times: notifyTimes(u), wd: u.notify_wd || '1111111', always: !!u.notify_always } },
     fridge: { id: fid, name: f.name, tpl: f.tpl || DEFAULT_TPL, ownerId: f.owner_id },
     members: members.map((m) => ({ id: m.id, name: m.nick || m.name, tgName: m.name, nick: m.nick || '', role: m.role, bot: !!m.can_dm, photoV: m.has_photo ? m.photo_v : 0 })),
     products, asks,
@@ -353,20 +353,30 @@ function digestText(products, today, days) {
   return s.trim();
 }
 
+const weekdayIdx = (date) => (new Date(date + 'T00:00:00Z').getUTCDay() + 6) % 7; // 0 — понедельник
+function notifyTimes(u) {
+  try { const a = JSON.parse(u.notify_times); if (Array.isArray(a) && a.length) return a; } catch (e) { /* старая запись: одно время */ }
+  return [u.notify_time];
+}
+const calmText = (days) => `Всё свежее. Ближайшие ${days} ${plural(days, 'день', 'дня', 'дней')} ничего не портится.`;
+
 // Раз в минуту: кому пора прислать сводку. Окно 3 часа — если сервер перезапускался, сводка всё равно придёт.
 function queueReminders(db, cfg, d = new Date()) {
   const now = mskNow(cfg.TZ || 'Europe/Moscow', d);
   const users = db.prepare('SELECT u.*, m.fridge_id FROM users u JOIN members m ON m.user_id=u.id WHERE u.notify_on=1 AND u.can_dm=1 AND u.consent_at IS NOT NULL').all();
   let n = 0;
   for (const u of users) {
-    const [h, mi] = u.notify_time.split(':').map(Number), [nh, nm] = now.time.split(':').map(Number);
-    const diff = nh * 60 + nm - (h * 60 + mi);
-    if (diff < 0 || diff > 180) continue;
-    const products = db.prepare('SELECT name,e,exp FROM products WHERE fridge_id=? AND exp IS NOT NULL').all(u.fridge_id);
-    const text = digestText(products, now.date, u.notify_days);
-    if (!text) continue;
-    const kb = cfg.PUBLIC_URL ? { inline_keyboard: [[{ text: 'Открыть Фридж', web_app: { url: cfg.PUBLIC_URL } }]] } : null;
-    if (enqueue(db, u.id, text, kb, `rem:${u.id}:${now.date}`)) n++;
+    if ((u.notify_wd || '1111111')[weekdayIdx(now.date)] !== '1') continue;
+    for (const t of notifyTimes(u)) {
+      const [h, mi] = t.split(':').map(Number), [nh, nm] = now.time.split(':').map(Number);
+      const diff = nh * 60 + nm - (h * 60 + mi);
+      if (diff < 0 || diff > 180) continue;
+      const products = db.prepare('SELECT name,e,exp FROM products WHERE fridge_id=? AND exp IS NOT NULL').all(u.fridge_id);
+      const text = digestText(products, now.date, u.notify_days) || (u.notify_always ? calmText(u.notify_days) : null);
+      if (!text) continue;
+      const kb = cfg.PUBLIC_URL ? { inline_keyboard: [[{ text: 'Открыть Фридж', web_app: { url: cfg.PUBLIC_URL } }]] } : null;
+      if (enqueue(db, u.id, text, kb, `rem:${u.id}:${now.date}:${t}`)) { n++; break; } // за один проход — одно сообщение человеку
+    }
   }
   return n;
 }
@@ -376,5 +386,5 @@ module.exports = {
   getUser, membership, upsertUser, ensureFridge, leaveFridge, newInvite, pendingInvite, revokeInvites, joinByToken,
   stateFor, addProducts, updateProduct, deleteProduct, renderAsk, createAsk, markAskDone,
   displayName, calcExp, setNick, setPhoto, getPhoto, markNewsRead,
-  mskNow, digestText, queueReminders
+  mskNow, digestText, queueReminders, notifyTimes
 };

@@ -90,6 +90,9 @@ function migrate(db) {
   addCol(db, 'products', 'shelf_u', 'TEXT');         // срок годности: единица (д, нед, мес, год)
   addCol(db, 'users', 'news_read', 'TEXT');          // какие новости уже прочитаны (JSON)
   addCol(db, 'users', 'news_off', 'INTEGER NOT NULL DEFAULT 0'); // отказался от рассылки владельца (/news)
+  addCol(db, 'users', 'notify_wd', "TEXT NOT NULL DEFAULT '1111111'"); // дни недели напоминаний, с понедельника: 1 — писать
+  addCol(db, 'users', 'notify_times', 'TEXT');       // до трёх времён в день, JSON-массив (если пусто, берём notify_time)
+  addCol(db, 'users', 'notify_always', 'INTEGER NOT NULL DEFAULT 0'); // 1 — писать по расписанию, даже если ничего не портится
   addCol(db, 'users', 'seen_at', 'TEXT');            // когда в последний раз открывал приложение
   addCol(db, 'outbox', 'kind', "TEXT NOT NULL DEFAULT 'text'");  // text | photo | album
   addCol(db, 'outbox', 'media', 'TEXT');             // file_id картинок (JSON)

@@ -134,9 +134,22 @@ async function api(req, res, url) {
     const on = body.on === undefined ? u.notify_on : body.on ? 1 : 0;
     const days = body.days === undefined ? u.notify_days : [1, 2, 3, 5].includes(Number(body.days)) ? Number(body.days) : 0;
     if (!days) throw new C.HttpError(400, 'дни');
-    const time = body.time === undefined ? u.notify_time : /^([01]\d|2[0-3]):[0-5]\d$/.test(body.time) ? body.time : '';
+    const okTime = (t) => typeof t === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(t);
+    let time = body.time === undefined ? u.notify_time : okTime(body.time) ? body.time : '';
     if (!time) throw new C.HttpError(400, 'время');
-    db.prepare('UPDATE users SET notify_on=?, notify_days=?, notify_time=? WHERE id=?').run(on, days, time, uid);
+    let times = u.notify_times;
+    if (body.times !== undefined) {
+      const list = Array.isArray(body.times) ? [...new Set(body.times)].filter(okTime).sort() : [];
+      if (list.length < 1 || list.length > 3 || list.length !== (Array.isArray(body.times) ? new Set(body.times).size : -1)) throw new C.HttpError(400, 'Время: от одного до трёх раз в день');
+      times = JSON.stringify(list); time = list[0];
+    } else if (body.time !== undefined) times = JSON.stringify([time]);
+    let wd = u.notify_wd || '1111111';
+    if (body.wd !== undefined) {
+      if (typeof body.wd !== 'string' || !/^[01]{7}$/.test(body.wd) || !body.wd.includes('1')) throw new C.HttpError(400, 'Выбери хотя бы один день недели');
+      wd = body.wd;
+    }
+    const always = body.always === undefined ? u.notify_always : body.always ? 1 : 0;
+    db.prepare('UPDATE users SET notify_on=?, notify_days=?, notify_time=?, notify_times=?, notify_wd=?, notify_always=? WHERE id=?').run(on, days, time, times, wd, always, uid);
     return send(res, 200, { ok: true });
   }
   if (m === 'POST' && p === '/invite') {
