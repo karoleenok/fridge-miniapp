@@ -67,6 +67,49 @@ svg{display:block;flex:none}
 .av.t1{background:var(--blue);color:var(--on-blue)}
 .av.t2{background:var(--tint-2);color:var(--fg)}
 .av.sm{width:24px;height:24px;font-size:11px}
+.av{overflow:hidden}
+.av img{display:block;width:100%;height:100%;object-fit:cover}
+.av.xl{width:96px;height:96px;font-size:36px}
+.hdr-r{display:flex;align-items:center;gap:2px;flex:none}
+.bell{position:relative;flex:none}
+.nbadge{position:absolute;top:3px;right:2px;min-width:18px;height:18px;padding:0 5px;border-radius:999px;background:var(--blue);color:var(--on-blue);font-size:11px;font-weight:700;line-height:18px;text-align:center;box-shadow:0 0 0 2px var(--bg);pointer-events:none}
+.nbadge[hidden]{display:none}
+.tabhead.hrow{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.tabhead.hrow>div{min-width:0}
+.nw-list{margin-top:4px}
+.nw{margin-top:12px;padding:14px 16px;border:1.5px solid var(--line-soft);border-radius:20px}
+.nw.fresh{border-color:var(--blue)}
+.nw-h{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;color:var(--fg-2)}
+.nw-h .d{margin-left:auto}
+.nw-t{margin-top:8px;font-size:17px;font-weight:700;line-height:1.25;overflow-wrap:anywhere}
+.nw-x{margin-top:6px;font-size:15px;line-height:1.45;color:var(--fg-2);overflow-wrap:anywhere}
+.nw-a{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.pf{display:flex;align-items:center;gap:16px;margin-top:16px}
+.pf-b{display:flex;flex-direction:column;align-items:flex-start;gap:8px;min-width:0}
+.pf-b .btn{width:auto;padding:0 16px}
+.sublbl{display:block;font-weight:600;font-size:14px;margin:14px 0 8px}
+.shelfrow{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}
+.hint.calc{color:var(--fg);font-weight:600}
+.life{height:8px;margin:10px 0 2px;border-radius:4px;background:var(--tint);overflow:hidden}
+.life i{display:block;height:100%;border-radius:4px;background:var(--blue)}
+.life.warn i{background:var(--warn)}.life.bad i{background:var(--danger)}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}
+.stat{padding:14px 16px;border:1.5px solid var(--line-soft);border-radius:20px}
+.stat b{display:block;font-size:28px;line-height:1.1;font-weight:700;font-variant-numeric:tabular-nums}
+.stat span{display:block;margin-top:4px;font-size:13px;color:var(--fg-2)}
+.bars{display:flex;align-items:flex-end;gap:6px;height:96px;margin-top:12px}
+.bars>div{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:4px;font-size:12px;color:var(--fg-2)}
+.bars i{display:block;width:100%;min-height:3px;border-radius:6px 6px 2px 2px;background:var(--blue)}
+.bars em{font-style:normal;font-variant-numeric:tabular-nums}
+.note{padding:12px 0;border-bottom:1px solid var(--line-soft)}
+.note p{white-space:pre-wrap;overflow-wrap:anywhere;font-size:15px;line-height:1.45}
+.note small{display:block;margin-top:4px;font-size:12px;color:var(--fg-2)}
+.note .na{display:flex;gap:4px;margin-top:6px}
+.note .na .btn{min-height:44px;width:auto;padding:0 12px;font-size:14px}
+.arow{display:flex;justify-content:space-between;gap:12px;padding:10px 0;border-bottom:1px solid var(--line-soft);font-size:14px}
+.arow span:last-child{color:var(--fg-2);white-space:nowrap}
+.asec{margin-top:28px;font-size:18px;font-weight:700}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 .chips{display:flex;flex-wrap:wrap;gap:8px}
 .chip{flex:none;display:inline-flex;align-items:center;gap:6px;min-height:40px;padding:0 16px;border-radius:999px;border:1.5px solid var(--line-soft);font-weight:500;background:var(--bg);white-space:nowrap}
 .chip[aria-pressed="true"]{background:var(--tint);border:2px solid var(--line);font-weight:600;padding:0 15px}
@@ -336,7 +379,7 @@ textarea.input{padding:14px 16px;min-height:96px;resize:none;line-height:1.4;fon
             <span class="tag" id="dateTag"></span>
             <h1 id="fridgeTitle"></h1>
           </div>
-          <button class="avs" data-act="go-family" id="avs" aria-label="Участники холодильника"></button>
+          <div class="hdr-r"><button class="iconbtn bell" data-act="news" aria-label="Что нового"><svg class="ic" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0112 0v5l2 2H4z"/><path d="M10 21h4"/></svg><span class="nbadge" hidden></span></button><button class="avs" data-act="go-family" id="avs" aria-label="Участники холодильника"></button></div>
         </div>
         <div class="gut"><div class="hero" id="hero"></div></div>
         <div class="listhead gut">
@@ -351,10 +394,7 @@ textarea.input{padding:14px 16px;min-height:96px;resize:none;line-height:1.4;fon
       </div>
 
       <div class="tab" id="tab-buy" hidden>
-        <div class="tabhead gut">
-          <span class="tag">покупки</span>
-          <h1>Кто что купит</h1>
-        </div>
+        <div class="tabhead gut hrow"><div><span class="tag">покупки</span><h1>Кто что купит</h1></div><button class="iconbtn bell" data-act="news" aria-label="Что нового"><svg class="ic" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0112 0v5l2 2H4z"/><path d="M10 21h4"/></svg><span class="nbadge" hidden></span></button></div>
         <div class="gut" style="margin-top:16px">
           <button class="btn primary" data-act="ask-open">Попросить купить</button>
         </div>
@@ -369,10 +409,7 @@ textarea.input{padding:14px 16px;min-height:96px;resize:none;line-height:1.4;fon
       </div>
 
       <div class="tab" id="tab-family" hidden>
-        <div class="tabhead gut">
-          <span class="tag">семья</span>
-          <h1>Холодильник на всех</h1>
-        </div>
+        <div class="tabhead gut hrow"><div><span class="tag">семья</span><h1>Холодильник на всех</h1></div><button class="iconbtn bell" data-act="news" aria-label="Что нового"><svg class="ic" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0112 0v5l2 2H4z"/><path d="M10 21h4"/></svg><span class="nbadge" hidden></span></button></div>
         <div class="gut" style="margin-top:16px">
           <div class="field"><label for="fridgeName">Название холодильника</label>
             <input class="input" id="fridgeName" maxlength="30" autocomplete="off" enterkeyhint="done"></div>
@@ -396,13 +433,17 @@ textarea.input{padding:14px 16px;min-height:96px;resize:none;line-height:1.4;fon
           </div>
         </div>
         <div class="gut" id="members"></div>
+        <div class="gut" id="adminEntry" hidden>
+          <div class="card">
+            <h2>Для владельца</h2>
+            <p class="hint" style="margin:0 0 12px">Статистика, заметки и рассылка всем пользователям.</p>
+            <button class="btn outline" data-act="admin-open">Открыть</button>
+          </div>
+        </div>
       </div>
 
       <div class="tab" id="tab-notify" hidden>
-        <div class="tabhead gut">
-          <span class="tag">напоминания</span>
-          <h1>Скажу, пока не поздно</h1>
-        </div>
+        <div class="tabhead gut hrow"><div><span class="tag">напоминания</span><h1>Скажу, пока не поздно</h1></div><button class="iconbtn bell" data-act="news" aria-label="Что нового"><svg class="ic" viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0112 0v5l2 2H4z"/><path d="M10 21h4"/></svg><span class="nbadge" hidden></span></button></div>
         <div class="gut" id="notifyBody"></div>
       </div>
 
@@ -441,9 +482,26 @@ textarea.input{padding:14px 16px;min-height:96px;resize:none;line-height:1.4;fon
         <p class="hint" id="catHint" hidden></p>
       </div>
       <div class="field">
-        <label for="fDate">Годен до <span style="font-weight:400;color:var(--fg-2)">· срок или точная дата</span></label>
-        <div class="chips" id="quickDays" style="margin-bottom:10px"></div>
-        <input class="input" id="fDate" type="date" aria-describedby="dateNote">
+        <div class="lbl" id="lblTerm">Срок</div>
+        <div class="seg full" role="group" aria-labelledby="lblTerm" id="termSeg">
+          <button data-act="fmode" data-m="exp" aria-pressed="true">Годен до</button>
+          <button data-act="fmode" data-m="made" aria-pressed="false">От производства</button>
+        </div>
+        <div id="modeExp" style="margin-top:12px">
+          <div class="chips" id="quickDays" style="margin-bottom:10px"></div>
+          <input class="input" id="fDate" type="date" aria-label="Годен до" aria-describedby="dateNote">
+        </div>
+        <div id="modeMade" hidden>
+          <label class="sublbl" for="fMade">Изготовлено</label>
+          <div class="chips" id="madeQuick" style="margin-bottom:10px"></div>
+          <input class="input" id="fMade" type="date" aria-describedby="dateNote">
+          <label class="sublbl" for="fShelfN">Срок годности</label>
+          <div class="shelfrow">
+            <input class="input" id="fShelfN" type="text" inputmode="numeric" pattern="[0-9]*" maxlength="3" autocomplete="off" placeholder="Например, 14" aria-describedby="dateNote">
+            <select class="input" id="fShelfU" aria-label="Единица срока годности"></select>
+          </div>
+          <div class="chips" id="shelfQuick" style="margin-top:10px"></div>
+        </div>
         <p class="hint" id="dateNote"></p>
       </div>
       <div class="field">
@@ -543,6 +601,15 @@ textarea.input{padding:14px 16px;min-height:96px;resize:none;line-height:1.4;fon
     </footer>
   </section>
 
+  <section class="screen" id="admin" role="dialog" aria-modal="true" aria-labelledby="adminTitle" style="z-index:44" hidden>
+    <header class="bar gut">
+      <button class="iconbtn" data-act="admin-close" aria-label="Назад"><svg class="ic" viewBox="0 0 24 24"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <h2 id="adminTitle" tabindex="-1">Для владельца</h2>
+      <button class="iconbtn" data-act="admin-refresh" aria-label="Обновить" style="margin-left:auto"><svg class="ic" viewBox="0 0 24 24"><path d="M20 12a8 8 0 10-2.5 5.8M20 5v5h-5"/></svg></button>
+    </header>
+    <div class="fbody gut" id="adminBody"></div>
+  </section>
+
   <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
 </div>
 
@@ -565,6 +632,13 @@ var fmt=function(s){return parse(s).toLocaleDateString('ru-RU',{day:'numeric',mo
 var fmtLong=function(s){return parse(s).toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'})};
 var fmtQty=function(q){return String(Math.round(q*10)/10).replace('.',',')};
 var daysWord=function(n){return n+' '+plural(n,'день','дня','дней')};
+/* срок от даты производства: считаем так же, как сервер */
+var SHELF=[['д','дн.'],['нед','нед.'],['мес','мес.'],['год','лет']];
+var SHELF_MAX={'д':3650,'нед':520,'мес':120,'год':10};
+function addDaysIso(s,n){var d=parse(s);d.setDate(d.getDate()+n);return iso(d)}
+function addMonthsIso(s,n){var a=s.split('-').map(Number),t=a[0]*12+(a[1]-1)+n,y=Math.floor(t/12),m=t%12,last=new Date(y,m+1,0).getDate();return iso(new Date(y,m,Math.min(a[2],last)))}
+function calcExp(made,n,u){return u==='д'?addDaysIso(made,n):u==='нед'?addDaysIso(made,n*7):u==='мес'?addMonthsIso(made,n):addMonthsIso(made,n*12)}
+function shelfWord(n,u){return n+' '+(u==='д'?plural(n,'день','дня','дней'):u==='нед'?plural(n,'неделя','недели','недель'):u==='мес'?plural(n,'месяц','месяца','месяцев'):plural(n,'год','года','лет'))}
 
 var CATS=[
  {id:'dairy',n:'Молочное и яйца',s:'Молочное',e:'🥛'},
@@ -615,7 +689,7 @@ var state={
   meName:'Каролина',tpl:DEFAULT_TPL,asks:[],nextAsk:1,
   pending:false,token:mkToken(),memo:{},custom:[],customMap:{},otherOpen:false,
   notify:{on:true,days:3,time:'09:00',who:'all'},
-  rev:{},openId:null,undo:null,lastFocus:null
+  rev:{},openId:null,undo:null,lastFocus:null,admin:!LIVE,newsRead:[]
 };
 
 function seed(){
@@ -631,7 +705,7 @@ function seed(){
   state.products=L.map(function(r){return {id:state.nextId++,name:r[0],e:r[1],c:r[2],exp:addDays(r[3]),q:r[4],u:r[5],by:r[6],added:addDays(-r[7])}});
 }
 function member(id){return state.members.filter(function(m){return m.id===id})[0]}
-function avHTML(m,cls){return '<span class="av t'+m.tone+(cls?' '+cls:'')+'" aria-hidden="true">'+esc(m.name.charAt(0))+'</span>'}
+function avHTML(m,cls){var inner=m.photo?'<img src="'+esc(m.photo)+'" alt="">':esc((m.real||m.name).charAt(0));return '<span class="av t'+m.tone+(cls?' '+cls:'')+'" aria-hidden="true">'+inner+'</span>'}
 
 /* ---------- показ экранов ---------- */
 function setView(v){
@@ -650,7 +724,7 @@ function setTab(t){
   if(t==='family')renderFamily();
   if(t==='notify')renderNotify();
 }
-function renderAll(){renderProducts();renderBuy();renderFamily();renderNotify();setTab(state.tab)}
+function renderAll(){renderProducts();renderBuy();renderFamily();renderNotify();setTab(state.tab);paintNews()}
 
 /* ---------- продукты ---------- */
 function badge(p){
@@ -672,8 +746,9 @@ function rowHTML(p,flash){
 }
 function sorted(a){return a.slice().sort(function(x,y){return left(x)-left(y)})}
 function renderProducts(){
+  paintNews();
   var N=state.notify.days,P=state.products;
-  $('#dateTag').textContent=today().toLocaleDateString('ru-RU',{weekday:'long',day:'numeric',month:'long'});
+  $('#dateTag').textContent=today().toLocaleDateString('ru-RU',window.innerWidth<380?{day:'numeric',month:'long'}:{weekday:'long',day:'numeric',month:'long'});
   $('#fridgeTitle').textContent=state.fridge;
   $('#avs').innerHTML=state.members.map(function(m){return avHTML(m)}).join('')+(state.pending?'<span class="av t2" style="border:2px dashed var(--tint-2);background:var(--bg)" aria-hidden="true">?</span>':'');
   $('#avs').setAttribute('aria-label','Участники: '+state.members.length+'. Открыть раздел «Семья»');
@@ -750,13 +825,19 @@ function itemSheet(p){
   openSheet('<div class="gut"><div class="grab"></div>'+
    '<div class="sh-head"><span class="ico lg" aria-hidden="true">'+esc(p.e)+'</span><div><h3 id="shTitle">'+esc(p.name)+'</h3><p>'+c.n+'</p></div><button class="iconbtn" data-act="close-sheet" aria-label="Закрыть"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>'+
    '<div class="facts">'+
+    (p.made?'<div class="fact"><span class="k">Изготовлено</span><span class="v">'+esc(fmtLong(p.made))+'</span></div><div class="fact"><span class="k">Срок годности</span><span class="v">'+shelfWord(p.sn,p.su)+'</span></div>':'')+
     '<div class="fact"><span class="k">Годен до</span><span class="v">'+(p.exp?esc(fmtLong(p.exp)):'не указан')+'</span></div>'+
-    '<div class="fact"><span class="k">Осталось</span><span class="v '+(b.cls)+'">'+rest+'</span></div>'+
+    '<div class="fact"><span class="k">Осталось</span><span class="v '+(b.cls)+'">'+rest+'</span></div>'+lifeBar(p)+
     '<div class="fact"><span class="k">Количество</span><span class="step"><button data-act="qty" data-d="-1" aria-label="Меньше">−</button><output id="shQty" aria-live="polite">'+fmtQty(p.q)+' '+p.u+'</output><button data-act="qty" data-d="1" aria-label="Больше">+</button></span></div>'+
     '<div class="fact"><span class="k">Добавил(а)</span><span class="v">'+avHTML(m,'sm')+esc(m.name)+' · '+fmt(p.added)+'</span></div>'+
    '</div>'+
    (p.exp?'<div class="sh-actions"><button class="btn primary" data-act="eat">Съели</button><div class="two"><button class="btn outline" data-act="trash">Выбросили</button><button class="btn outline" data-act="edit">Изменить</button></div></div></div>':'<div class="sh-actions"><button class="btn primary" data-act="open-dates" data-id="'+p.id+'">Указать срок</button><div class="two"><button class="btn outline" data-act="eat">Съели</button><button class="btn outline" data-act="trash">Выбросили</button></div><button class="btn text" data-act="edit">Изменить название или количество</button></div></div>'),
    '#shTitle');
+}
+function lifeBar(p){
+  if(!p.made||!p.exp)return '';
+  var tot=Math.max(1,Math.round((parse(p.exp)-parse(p.made))/DAY)),used=Math.round((today()-parse(p.made))/DAY),pct=Math.max(0,Math.min(100,Math.round(used/tot*100))),d=left(p);
+  return '<div class="life '+(d<0?'bad':d<=state.notify.days?'warn':'')+'" role="img" aria-label="Прошло '+pct+'% срока годности"><i style="width:'+pct+'%"></i></div>';
 }
 function findP(id){return state.products.filter(function(p){return p.id===Number(id)})[0]}
 
@@ -915,17 +996,18 @@ function buyDone(id){
 
 /* ---------- форма ---------- */
 var form=null;
-function newForm(){return {id:null,name:'',c:'other',e:'📦',exp:addDays(7),q:1,u:'шт',matched:null,catTouched:false,dateTouched:false,qtyTouched:false,editing:false,needDate:false,viaScan:false,memoDays:null}}
+function newForm(){return {id:null,name:'',c:'other',e:'📦',exp:addDays(7),q:1,u:'шт',matched:null,catTouched:false,dateTouched:false,qtyTouched:false,editing:false,needDate:false,viaScan:false,memoDays:null,mode:'exp',made:'',sn:'',su:'д'}}
 function openForm(p,prefillName){
   state.lastFocus=document.activeElement;
   form=newForm();
-  if(p){form.id=p.id;form.name=p.name;form.c=p.c;form.e=p.e;form.exp=p.exp;form.q=p.q;form.u=p.u;form.catTouched=form.dateTouched=form.qtyTouched=true;form.editing=true}
+  if(p){form.id=p.id;form.name=p.name;form.c=p.c;form.e=p.e;form.exp=p.exp;form.q=p.q;form.u=p.u;form.catTouched=form.dateTouched=form.qtyTouched=true;form.editing=true;if(p.made){form.mode='made';form.made=p.made;form.sn=String(p.sn);form.su=p.su}}
   $('#form').hidden=false;$('#main').inert=true;$('#app').classList.add('formopen');
   $('#formTitle').textContent=p?'Изменить продукт':'Новый продукт';
   $('#saveBtn').textContent=p?'Сохранить':'Добавить в холодильник';
   $('#againBtn').hidden=!!p;
   $('#fName').value=form.name;$('#errName').hidden=true;$('#fName').removeAttribute('aria-invalid');
   $('#fUnit').innerHTML=UNITS.map(function(u){return '<option value="'+u+'">'+u+'</option>'}).join('');
+  $('#fShelfU').innerHTML=SHELF.map(function(x){return '<option value="'+x[0]+'">'+x[1]+'</option>'}).join('');
   $('#quickChips').innerHTML=POPULAR.map(function(n){var d=byName(n);return '<button class="chip" data-act="pick" data-n="'+esc(n)+'">'+d.e+' '+esc(n)+'</button>'}).join('');
   if(prefillName){var d=byName(prefillName);if(d)applyEntry(d,true)}
   refreshForm();
@@ -959,6 +1041,14 @@ function onNameInput(){
   else form.matched=null;
   refreshForm();
 }
+function madeExp(){
+  if(!form.made)return {err:'Выбери дату производства: она есть на упаковке.'};
+  if(form.made>addDays(0))return {err:'Дата производства в будущем. Проверь число.'};
+  var n=parseInt(form.sn,10);
+  if(!n||n<1)return {err:'Впиши срок годности: сколько дней, недель, месяцев или лет.'};
+  if(n>SHELF_MAX[form.su])return {err:'Слишком большой срок. Проверь число и единицу.'};
+  return {exp:calcExp(form.made,n,form.su)};
+}
 function refreshForm(){
   var v=form.name.trim(),m=findMatches(form.name);
   /* подсказки */
@@ -973,35 +1063,52 @@ function refreshForm(){
   else if(v.length>=3&&!form.matched&&!form.catTouched){ch.hidden=false;ch.textContent='Такого продукта не знаю. Выбери категорию сам.'}
   else ch.hidden=true;
   /* срок */
-  var days=[[1,'Завтра'],[3,'3 дня'],[7,'Неделя'],[14,'2 недели'],[30,'Месяц']];
-  $('#quickDays').innerHTML=days.map(function(x){return '<button class="chip" data-act="fdays" data-n="'+x[0]+'" aria-pressed="'+(form.exp===addDays(x[0])&&!(form.needDate&&!form.dateTouched))+'">'+x[1]+'</button>'}).join('');
-  $('#fDate').value=form.exp||'';
-  var dn=$('#dateNote');
-  if(!form.exp){dn.textContent='Выбери дату.'}
-  else{
-    var d=Math.round((parse(form.exp)-today())/DAY);
-    var t=d<0?'Срок уже прошёл, добавлю как просроченный.':d===0?'Сегодня последний день.':'Через '+daysWord(d)+', '+fmtLong(form.exp)+'.';
-    if(form.matched&&!form.dateTouched)t+=' Типичный срок, сверь с упаковкой.';
-    dn.textContent=t;
+  $$('#termSeg button').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.m===form.mode))});
+  $('#modeExp').hidden=form.mode!=='exp';$('#modeMade').hidden=form.mode!=='made';
+  var dn=$('#dateNote');dn.classList.remove('calc');
+  if(form.mode==='made'){
+    var mq=[[0,'Сегодня'],[-1,'Вчера'],[-3,'3 дня назад'],[-7,'Неделю назад']];
+    $('#madeQuick').innerHTML=mq.map(function(x){return '<button class="chip" data-act="fmq" data-d="'+x[0]+'" aria-pressed="'+(form.made===addDays(x[0]))+'">'+x[1]+'</button>'}).join('');
+    $('#fMade').value=form.made||'';$('#fMade').max=addDays(0);
+    $('#shelfQuick').innerHTML=[[7,'д'],[14,'д'],[1,'мес'],[3,'мес'],[6,'мес'],[1,'год']].map(function(x){return '<button class="chip" data-act="fshelf" data-n="'+x[0]+'" data-u="'+x[1]+'" aria-pressed="'+(String(form.sn)===String(x[0])&&form.su===x[1])+'">'+shelfWord(x[0],x[1])+'</button>'}).join('');
+    if(document.activeElement!==$('#fShelfN'))$('#fShelfN').value=form.sn;
+    $('#fShelfU').value=form.su;
+    var mx=madeExp();
+    if(mx.err)dn.textContent=mx.err;
+    else{var dl=Math.round((parse(mx.exp)-today())/DAY);dn.classList.add('calc');dn.textContent='Годен до '+fmtLong(mx.exp)+'. '+(dl<0?'Срок уже прошёл, добавлю как просроченный.':dl===0?'Сегодня последний день.':'Осталось '+daysWord(dl)+'.')}
+  }else{
+    var days=[[1,'Завтра'],[3,'3 дня'],[7,'Неделя'],[14,'2 недели'],[30,'Месяц']];
+    $('#quickDays').innerHTML=days.map(function(x){return '<button class="chip" data-act="fdays" data-n="'+x[0]+'" aria-pressed="'+(form.exp===addDays(x[0])&&!(form.needDate&&!form.dateTouched))+'">'+x[1]+'</button>'}).join('');
+    $('#fDate').value=form.exp||'';
+    if(!form.exp){dn.textContent='Выбери дату.'}
+    else{
+      var d=Math.round((parse(form.exp)-today())/DAY);
+      var t=d<0?'Срок уже прошёл, добавлю как просроченный.':d===0?'Сегодня последний день.':'Через '+daysWord(d)+', '+fmtLong(form.exp)+'.';
+      if(form.matched&&!form.dateTouched)t+=' Типичный срок, сверь с упаковкой.';
+      dn.textContent=t;
+    }
+    if(form.needDate&&!form.dateTouched){dn.textContent='Штрихкод не знает срок годности. Посмотри дату на упаковке и выбери её.'+(form.memoDays!=null?' В прошлый раз для этого товара брали '+daysWord(form.memoDays)+'.':'')}
+    $('#fDate').classList.toggle('need',!!(form.needDate&&!form.dateTouched));
   }
-  if(form.needDate&&!form.dateTouched){dn.textContent='Штрихкод не знает срок годности. Посмотри дату на упаковке и выбери её.'+(form.memoDays!=null?' В прошлый раз для этого товара брали '+daysWord(form.memoDays)+'.':'')}
-  $('#fDate').classList.toggle('need',!!(form.needDate&&!form.dateTouched));
   /* количество */
   $('#fQty').textContent=fmtQty(form.q);$('#fUnit').value=form.u;
 }
 function saveForm(again){
   var name=form.name.trim();
   if(name.length<1){var e=$('#errName');e.hidden=false;$('#fName').setAttribute('aria-invalid','true');$('#fName').focus();return}
-  if(!form.exp){$('#fDate').focus();return}
-  if(form.needDate&&!form.dateTouched){$('#fDate').focus();$('#dateNote').scrollIntoView({block:'center'});return}
+  var mx=form.mode==='made'?madeExp():null;
+  if(mx&&mx.err){(form.made&&form.made<=addDays(0)?$('#fShelfN'):$('#fMade')).focus();$('#dateNote').scrollIntoView({block:'center'});return}
+  if(!mx&&!form.exp){$('#fDate').focus();return}
+  if(!mx&&form.needDate&&!form.dateTouched){$('#fDate').focus();$('#dateNote').scrollIntoView({block:'center'});return}
+  var fexp=mx?mx.exp:form.exp,fmade=mx?form.made:null,fsn=mx?parseInt(form.sn,10):null,fsu=mx?form.su:null;
   var flashId,wasScan=form.viaScan;
-  if(form.matched&&form.dateTouched){var dl=Math.round((parse(form.exp)-today())/DAY);if(dl>0)state.memo[form.matched.n]=dl}
+  if(!mx&&form.matched&&form.dateTouched){var dl=Math.round((parse(form.exp)-today())/DAY);if(dl>0)state.memo[form.matched.n]=dl}
   if(form.id){
-    var p=findP(form.id);p.name=name;p.c=form.c;p.e=form.e;p.exp=form.exp;p.q=form.q;p.u=form.u;flashId=p.id;
-    sync('PATCH','/products/'+p.id,{name:p.name,c:p.c,e:p.e,exp:p.exp,q:p.q,u:p.u});
+    var p=findP(form.id);p.name=name;p.c=form.c;p.e=form.e;p.exp=fexp;p.made=fmade;p.sn=fsn;p.su=fsu;p.q=form.q;p.u=form.u;flashId=p.id;
+    sync('PATCH','/products/'+p.id,{name:p.name,c:p.c,e:p.e,exp:p.exp,made:fmade,sn:fsn,su:fsu,q:p.q,u:p.u});
     toast('Сохранено');
   }else{
-    var np={id:state.nextId++,name:name,e:form.e,c:form.c,exp:form.exp,q:form.q,u:form.u,by:'me',added:iso(today())};
+    var np={id:state.nextId++,name:name,e:form.e,c:form.c,exp:fexp,made:fmade,sn:fsn,su:fsu,q:form.q,u:form.u,by:'me',added:iso(today())};
     state.products.push(np);flashId=np.id;pushProducts([np]);
     toast('Добавлено: '+name+', до '+fmt(np.exp));
   }
@@ -1048,6 +1155,7 @@ function updateRevCta(){
 
 /* ---------- семья ---------- */
 function inviteLink(){if(LIVE)return state.liveInvite?'t.me/'+(state.botName||'friidge_bot')+'?start=inv_'+state.liveInvite:'Нажми «Пригласить», и ссылка появится';return 't.me/fridge_demo_bot?startapp=inv-'+state.token}
+function canEditMember(m){return m.id==='me'||(LIVE?!!state.isOwner:true)}
 function renderFamily(){
   var fn=$('#fridgeName');if(document.activeElement!==fn)fn.value=state.fridge;
   $('#linkTxt').textContent=inviteLink();
@@ -1055,16 +1163,220 @@ function renderFamily(){
   state.members.forEach(function(m){
     var n=state.products.filter(function(p){return p.by===m.id}).length;
     var meta=(m.role==='owner'?'владелец':'участник')+(m.bot===false?' · не запускал(а) бота':' · добавил(а) '+n+' '+plural(n,'продукт','продукта','продуктов'));
-    h+='<button class="mem" '+((m.id==='me'||(LIVE&&!state.isOwner))?'disabled style="cursor:default"':'data-act="member-open" data-id="'+m.id+'"')+'>'+
+    h+='<button class="mem" '+(canEditMember(m)?'data-act="member-open" data-id="'+m.id+'"':'disabled style="cursor:default"')+'>'+
       avHTML(m)+'<span style="min-width:0"><span class="nm" style="display:block">'+esc(m.name)+'</span><span class="mt" style="display:block">'+meta+'</span></span>'+
-      (m.id==='me'?'<span class="pill">это вы</span>':(LIVE&&!state.isOwner)?'<span></span>':'<span class="mt" aria-hidden="true">···</span>')+'</button>';
+      (m.id==='me'?'<span class="pill">это вы</span>':canEditMember(m)?'<span class="mt" aria-hidden="true">Изменить</span>':'<span></span>')+'</button>';
   });
   if(state.pending){
     h+='<div class="mem pend"><span class="av" aria-hidden="true">?</span><span style="min-width:0"><span class="nm" style="display:block">Приглашение отправлено</span><span class="mt" style="display:block">ждёт, пока перейдут по ссылке</span></span><button class="btn text sm" style="min-height:44px;padding:0 8px" data-act="pend-revoke">Отозвать</button></div>'+
       '<button class="demo" data-act="demo-join">Прототип: имитировать, что друг перешёл по ссылке</button>';
   }
   $('#members').innerHTML=h;
+  $('#adminEntry').hidden=!state.admin;
 }
+
+/* ---------- ник и фото ---------- */
+var pf=null;
+function photoFromFile(file){
+  return new Promise(function(res,rej){
+    if(!file||file.size>25*1048576){rej();return}
+    var fr=new FileReader();
+    fr.onerror=function(){rej()};
+    fr.onload=function(){
+      var img=new Image();
+      img.onerror=function(){rej()};
+      img.onload=function(){
+        var w=img.naturalWidth,h=img.naturalHeight,sq=Math.min(w,h);if(!sq){rej();return}
+        var c=document.createElement('canvas');c.width=c.height=256;var x=c.getContext('2d');
+        x.fillStyle='#fff';x.fillRect(0,0,256,256);x.drawImage(img,(w-sq)/2,(h-sq)/2,sq,sq,0,0,256,256);
+        var d=c.toDataURL('image/jpeg',.85);if(d.length>140000)d=c.toDataURL('image/jpeg',.6);
+        res(d);
+      };
+      img.src=fr.result;
+    };
+    fr.readAsDataURL(file);
+  });
+}
+function profileSheet(id){
+  var m=member(id);if(!m||!canEditMember(m))return;
+  var me=m.id==='me',nick=LIVE?(m.nick||''):(m.nick!=null?m.nick:(me?state.meName:m.name));
+  pf={id:id,photo:undefined};
+  openSheet('<div class="gut"><div class="grab"></div>'+
+   '<div class="sh-head"><div><h3 id="shTitle">'+(me?'Твой профиль':'Профиль: '+esc(m.name))+'</h3><p>'+(me?'Так тебя увидит семья':'Так его увидит семья')+'</p></div><button class="iconbtn" data-act="close-sheet" aria-label="Закрыть"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>'+
+   '<div class="pf"><span id="pfAv">'+avHTML(m,'xl')+'</span><div class="pf-b"><button class="btn outline sm" data-act="pf-pick">Выбрать фото</button><button class="btn text sm" data-act="pf-clear" id="pfClear"'+(m.photo?'':' hidden')+'>Убрать фото</button></div></div>'+
+   '<input type="file" id="pfFile" accept="image/*" hidden>'+
+   '<div class="field" style="margin-top:16px"><label for="pfNick">Ник</label><input class="input" id="pfNick" maxlength="24" autocomplete="off" enterkeyhint="done" value="'+esc(nick)+'" placeholder="'+esc(LIVE?(m.tgName||m.real||m.name):m.name)+'"><p class="hint">'+(me?'Так ты подписан':'Так он подписан')+' в семье и в сообщениях бота. Если оставить пустым, будет имя из Telegram.</p></div>'+
+   '<div class="sh-actions"><button class="btn primary" data-act="pf-save">Сохранить</button>'+(!me?'<button class="btn text" data-act="member-ask" data-id="'+id+'">Убрать из холодильника</button>':'')+'</div></div>');
+}
+function pfPreview(){
+  var m=member(pf.id);if(!m)return;
+  var ph=pf.photo===undefined?m.photo:pf.photo;
+  $('#pfAv').innerHTML=avHTML({tone:m.tone,name:m.name,real:m.real,photo:ph},'xl');
+  $('#pfClear').hidden=!ph;
+}
+function saveProfile(){
+  var m=member(pf.id);if(!m)return;
+  var nick=$('#pfNick').value.replace(/[<>]/g,'').replace(/\s+/g,' ').trim().slice(0,24);
+  var btn=$('[data-act="pf-save"]');
+  if(LIVE){
+    btn.disabled=true;
+    var jobs=[apiCall('PATCH','/members/'+m.tgId,{nick:nick})];
+    if(pf.photo!==undefined)jobs.push(apiCall('PUT','/members/'+m.tgId+'/photo',{photo:pf.photo}));
+    Promise.all(jobs).then(function(){closeSheet();loadLive(false,true);toast('Сохранено')}).catch(function(e){btn.disabled=false;toast(e.message||'Не получилось сохранить')});
+    return;
+  }
+  var me=m.id==='me';
+  m.nick=nick;
+  if(!me){if(!m.orig)m.orig=m.name;m.name=nick||m.orig}
+  m.real=nick||(me?state.meName:m.name);
+  if(pf.photo!==undefined)m.photo=pf.photo;
+  closeSheet();renderAll();toast('Сохранено');
+}
+/* фото из сервера подгружаем по номеру версии, чтобы не гонять картинки каждые 30 секунд */
+var photoCache={};
+function ensurePhotos(){
+  if(!LIVE)return;
+  state.members.forEach(function(m){
+    if(!m.photoV){m.photo=null;return}
+    var c=photoCache[m.tgId];
+    if(c&&c.v===m.photoV){m.photo=c.url;return}
+    if(c&&c.loading===m.photoV)return;
+    photoCache[m.tgId]={v:null,loading:m.photoV};
+    var want=m.photoV;
+    apiCall('GET','/members/'+m.tgId+'/photo').then(function(r){
+      photoCache[m.tgId]={v:want,url:r.photo};
+      var mm=member(uidMap(m.tgId));if(mm&&mm.photoV===want){mm.photo=r.photo;if(state.view==='main'&&!busyUI())renderAll()}
+    }).catch(function(){delete photoCache[m.tgId]});
+  });
+}
+
+/* ---------- новости ---------- */
+/* Сюда пишем только то, что человек заметит в работе Фриджа: новое умение, изменившийся порядок действий.
+   Цвет плашки, отступы, внутренние правки и всё для владельца сюда не идут.
+   Как добавить новость: допиши объект в начало NEWS и подними APP_V. id не повторяется.
+   go: tab:products | tab:buy | tab:family | tab:notify | add */
+var APP_V='1.1';
+var NEWS=[
+ {id:'n-made',date:'2026-11-04',kind:'update',title:'Срок годности считается сам',text:'Когда добавляешь продукт, выбери «От производства»: впиши дату изготовления и срок годности в днях, неделях, месяцах или годах. Фридж сам посчитает, до какого числа можно есть, и напомнит заранее.',acts:[{l:'Добавить продукт',go:'add'}]},
+ {id:'n-profile',date:'2026-11-04',kind:'update',title:'Свой ник и фото в семье',text:'Открой «Семья» и нажми на своё имя: можно поставить любое фото и поменять ник. Бот будет подписывать им твои просьбы купить. Владелец холодильника может поправить ник и фото других.',acts:[{l:'Открыть «Семья»',go:'tab:family'}]},
+ {id:'n-bell',date:'2026-11-04',kind:'update',title:'Здесь теперь новости',text:'Колокольчик сверху загорается, когда в Фридже появилось что-то новое. Пишем сюда только то, что меняет работу приложения.'}
+];
+var NEWS_LS='fridge-news-read';
+function lsGet(k,d){try{var v=localStorage.getItem(k);return v?JSON.parse(v):d}catch(e){return d}}
+function lsSet(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}}
+function newsRead(){var r={};lsGet(NEWS_LS,[]).concat(state.newsRead||[]).forEach(function(i){r[i]=1});return r}
+function newsUnread(){var r=newsRead();return NEWS.filter(function(n){return !r[n.id]})}
+function paintNews(){
+  var n=newsUnread().length;
+  $$('.nbadge').forEach(function(b){b.hidden=!n;b.textContent=n>9?'9+':String(n)});
+  $$('.bell').forEach(function(b){b.setAttribute('aria-label',n?'Что нового, непрочитанных: '+n:'Что нового')});
+}
+function newsMark(ids){
+  if(!ids.length)return;
+  var r=newsRead(),all=lsGet(NEWS_LS,[]);
+  ids.forEach(function(i){if(all.indexOf(i)<0)all.push(i);r[i]=1});
+  lsSet(NEWS_LS,all.slice(-100));
+  state.newsRead=(state.newsRead||[]).concat(ids.filter(function(i){return (state.newsRead||[]).indexOf(i)<0}));
+  sync('POST','/news-read',{ids:ids});
+  paintNews();
+}
+function openNews(){
+  var read=newsRead(),fresh=NEWS.filter(function(n){return !read[n.id]}).map(function(n){return n.id});
+  var cards=NEWS.map(function(n){
+    var isNew=fresh.indexOf(n.id)>-1;
+    return '<div class="nw'+(isNew?' fresh':'')+'"><div class="nw-h"><span class="pill">'+(n.kind==='update'?'Обновление':'Новость')+'</span>'+(isNew?'<span class="pill ask">новое</span>':'')+'<span class="d">'+esc(fmt(n.date))+'</span></div>'+
+     '<div class="nw-t">'+esc(n.title)+'</div>'+(n.text?'<div class="nw-x">'+esc(n.text)+'</div>':'')+
+     (n.acts&&n.acts.length?'<div class="nw-a">'+n.acts.slice(0,2).map(function(a){return '<button class="btn outline sm" data-act="news-go" data-go="'+esc(a.go)+'">'+esc(a.l)+'</button>'}).join('')+'</div>':'')+'</div>';
+  }).join('');
+  openSheet('<div class="gut"><div class="grab"></div><div class="sh-head"><div><h3 id="shTitle">Что нового</h3><p>Только то, что меняет работу Фриджа</p></div><button class="iconbtn" data-act="close-sheet" aria-label="Закрыть"><svg class="ic" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>'+
+   '<div class="nw-list">'+(cards||'<p class="hint">Пока тихо. Когда появится что-то новое, на колокольчике загорится цифра.</p>')+'</div><p class="hint" style="text-align:center;margin-top:16px">Версия '+APP_V+'</p></div>');
+  newsMark(fresh);
+}
+function newsGo(go){
+  closeSheet();
+  var a=String(go).split(':');
+  if(a[0]==='tab'&&['products','buy','family','notify'].indexOf(a[1])>-1)setTab(a[1]);
+  else if(a[0]==='add')openForm(null);
+}
+
+/* ---------- экран «Для владельца»: статистика, заметки, рассылка ---------- */
+var adm={data:null,edit:null,del:null,loading:false};
+function demoAdmin(){
+  var d=[];for(var i=6;i>=0;i--)d.push({d:addDays(-i),n:[0,1,0,2,1,3,2][6-i]});
+  return {stats:{total:9,botCanWrite:7,active7:6,newsOff:1,families:3,products:58,asks:14,days:d,recent:[{name:'Маша',d:addDays(0)},{name:'Антон',d:addDays(-1)},{name:'Лена',d:addDays(-3)}]},
+   notes:adm.demoNotes||(adm.demoNotes=[{id:2,text:'Проверить, как приходят просьбы «купить» на старых телефонах',created_at:addDays(-1)+' 12:00:00',updated_at:addDays(-1)+' 12:00:00'},{id:1,text:'Подумать про семейный тариф',created_at:addDays(-2)+' 10:00:00',updated_at:addDays(-2)+' 10:00:00'}]),
+   posts:[]};
+}
+function loadAdmin(){
+  if(!LIVE){adm.data=demoAdmin();renderAdmin();return}
+  adm.loading=true;
+  apiCall('GET','/admin').then(function(d){adm.data=d;adm.loading=false;renderAdmin()}).catch(function(e){adm.loading=false;$('#adminBody').innerHTML='<p class="hint">'+esc(e.message||'Не получилось загрузить')+'</p>'});
+}
+function openAdmin(){
+  if(!$('#sheet').hidden)closeSheet();
+  state.lastFocus=document.activeElement;
+  adm.edit=null;adm.del=null;
+  $('#toast').hidden=true;$('#admin').hidden=false;$('#main').inert=true;$('#app').classList.add('formopen');
+  $('#adminBody').innerHTML='<p class="hint">Загружаю…</p>';
+  loadAdmin();
+  var t=$('#adminTitle');if(t)t.focus({preventScroll:true});
+}
+function closeAdmin(){
+  $('#admin').hidden=true;$('#main').inert=!$('#form').hidden;if($('#form').hidden&&$('#dates').hidden)$('#app').classList.remove('formopen');
+  if(state.lastFocus&&document.contains(state.lastFocus)){try{state.lastFocus.focus({preventScroll:true})}catch(e){}}
+}
+function dmy(s){var m=String(s||'').match(/^(\d{4})-(\d{2})-(\d{2})/);return m?m[3]+'.'+m[2]:''}
+function renderAdmin(){
+  var D=adm.data;if(!D)return;
+  var S=D.stats,mx=Math.max.apply(null,S.days.map(function(x){return x.n}).concat([1]));
+  var h=(LIVE?'':'<p class="hint" style="margin-top:0">Пример на выдуманных цифрах. Настоящие появятся в боте.</p>')+
+   '<div class="stats">'+
+    [[S.total,'пришли и согласились'],[S.active7,'заходили за 7 дней'],[S.families,'семей, где больше одного'],[S.botCanWrite,'получают сообщения бота']].map(function(x){return '<div class="stat"><b>'+x[0]+'</b><span>'+x[1]+'</span></div>'}).join('')+'</div>'+
+   '<div class="asec">Кто присоединился</div><div class="bars" role="img" aria-label="Присоединились за 7 дней">'+S.days.map(function(x){return '<div><em>'+x.n+'</em><i style="height:'+Math.round(x.n/mx*70)+'px"></i><em>'+esc(dmy(x.d))+'</em></div>'}).join('')+'</div>'+
+   (S.recent.length?'<div style="margin-top:12px">'+S.recent.map(function(r){return '<div class="arow"><span>'+esc(r.name||'Без имени')+'</span><span>'+esc(dmy(r.d))+'</span></div>'}).join('')+'</div>':'')+
+   '<p class="hint">Отказались от рассылки: '+S.newsOff+'. Продуктов внутри: '+S.products+'. Просьб «купить»: '+S.asks+'.</p>'+
+   '<div class="asec">Заметки</div>'+
+   '<div class="field" style="margin-top:12px"><label for="noteNew" class="sr">Новая заметка</label><textarea class="input" id="noteNew" rows="3" maxlength="2000" placeholder="Что записать?" style="padding-top:12px"></textarea></div>'+
+   '<button class="btn primary" data-act="note-add" style="margin-top:8px">Добавить заметку</button>'+
+   '<p class="hint">Заметки те же, что в боте: /note пишет сюда, /notes показывает их там.</p>'+
+   '<div id="notesList">'+(D.notes.length?D.notes.map(noteHTML).join(''):'<p class="hint">Пока пусто.</p>')+'</div>'+
+   '<div class="asec">Рассылка</div>'+
+   '<p class="hint" style="font-size:14px;color:var(--fg);line-height:1.5">Пост собирается в чате с ботом: напиши <b>/send</b> и текст, потом пришли до 10 картинок. Бот покажет, как увидят люди, посчитает, сколько человек получит, и только после твоей кнопки отправит.</p>'+
+   (LIVE&&TGW&&TGW.openTelegramLink?'<button class="btn outline" data-act="admin-bot" style="margin-top:8px">Открыть бота</button>':'')+
+   (D.posts.length?'<div style="margin-top:12px">'+D.posts.map(function(p){var st=p.state==='done'?'ушло '+p.ok+' из '+p.total:p.state==='sending'?'отправляется':'черновик';return '<div class="arow"><span>'+esc((p.text||'Только картинки').slice(0,60))+'</span><span>'+st+'</span></div>'}).join('')+'</div>':'')+
+   '<div style="height:24px"></div>';
+  var keep=$('#noteNew')?$('#noteNew').value:'';
+  $('#adminBody').innerHTML=h;
+  if(keep)$('#noteNew').value=keep;
+}
+function noteHTML(n){
+  var ed=adm.edit===n.id,dl=adm.del===n.id;
+  return '<div class="note">'+(ed?'<textarea class="input" id="noteEdit" rows="4" maxlength="2000" style="padding-top:12px" aria-label="Текст заметки">'+esc(n.text)+'</textarea>':'<p>'+esc(n.text)+'</p>')+
+   '<small>'+esc(dmy(n.updated_at||n.created_at))+(n.updated_at&&n.created_at&&n.updated_at!==n.created_at?' · правка':'')+'</small>'+
+   '<div class="na">'+(ed?'<button class="btn primary sm" data-act="note-save" data-id="'+n.id+'">Сохранить</button><button class="btn text sm" data-act="note-cancel">Отмена</button>':
+    '<button class="btn text sm" data-act="note-edit" data-id="'+n.id+'">Изменить</button><button class="btn text sm" data-act="note-del" data-id="'+n.id+'"'+(dl?' style="color:var(--danger)"':'')+'>'+(dl?'Точно удалить?':'Удалить')+'</button>')+'</div></div>';
+}
+function noteApi(method,path,body,done){
+  if(!LIVE){
+    var L=adm.demoNotes||(adm.demoNotes=[]);
+    if(method==='POST'){var id=L.reduce(function(m,x){return Math.max(m,x.id)},0)+1;var now=iso(today())+' 12:00:00';L.unshift({id:id,text:body.text,created_at:now,updated_at:now})}
+    else{var i=L.map(function(x){return x.id}).indexOf(Number(path.split('/').pop()));if(i>-1){if(method==='PATCH'){L[i].text=body.text;L[i].updated_at=iso(today())+' 13:00:00'}else L.splice(i,1)}}
+    done();return;
+  }
+  apiCall(method,path,body).then(done).catch(function(e){toast(e.message||'Не получилось')});
+}
+function noteAct(a,id,el){
+  switch(a){
+   case 'note-add':var v=$('#noteNew').value.trim();if(!v){$('#noteNew').focus();return}
+     noteApi('POST','/admin/notes',{text:v},function(){$('#noteNew').value='';loadAdmin();toast('Заметка добавлена')});break;
+   case 'note-edit':adm.edit=Number(id);adm.del=null;renderAdmin();var te=$('#noteEdit');if(te){te.focus();te.setSelectionRange(te.value.length,te.value.length)}break;
+   case 'note-cancel':adm.edit=null;renderAdmin();break;
+   case 'note-save':var t=$('#noteEdit').value.trim();if(!t){$('#noteEdit').focus();return}
+     noteApi('PATCH','/admin/notes/'+id,{text:t},function(){adm.edit=null;loadAdmin();toast('Сохранено')});break;
+   case 'note-del':if(adm.del===Number(id)){noteApi('DELETE','/admin/notes/'+id,null,function(){adm.del=null;loadAdmin();toast('Заметка удалена')})}else{adm.del=Number(id);adm.edit=null;renderAdmin()}break;
+  }
+}
+
 function copyText(t){
   return (navigator.clipboard&&navigator.clipboard.writeText?navigator.clipboard.writeText(t):Promise.reject()).then(function(){return true},function(){
     try{var ta=document.createElement('textarea');ta.value=t;ta.style.cssText='position:fixed;opacity:0';document.body.appendChild(ta);ta.select();var ok=document.execCommand('copy');ta.remove();return ok}catch(e){return false}
@@ -1109,21 +1421,23 @@ function sync(method,path,body,then){if(!LIVE)return;apiCall(method,path,body).t
 function syncLater(key,method,path,bodyFn){if(!LIVE)return;clearTimeout(liveTimers[key]);liveTimers[key]=setTimeout(function(){sync(method,path,bodyFn())},600)}
 function pushProducts(list){
   if(!LIVE||!list.length)return;
-  sync('POST','/products',{items:list.map(function(p){return {name:p.name,e:p.e,c:p.c,exp:p.exp,q:p.q,u:p.u}})},function(r){list.forEach(function(p,i){p.id=r.ids[i]});renderProducts()});
+  sync('POST','/products',{items:list.map(function(p){return {name:p.name,e:p.e,c:p.c,exp:p.exp,made:p.made||null,sn:p.sn||null,su:p.su||null,q:p.q,u:p.u}})},function(r){list.forEach(function(p,i){p.id=r.ids[i]});renderProducts()});
 }
 function uidMap(id){return id===meId?'me':String(id)}
 function tgIdOf(id){var m=member(id);return m?m.tgId:0}
 function applyLive(s){
   meId=s.me.id;state.meName=s.me.name;state.meCanDm=s.me.canDm;state.botName=s.bot;
   state.fridge=s.fridge.name;state.tpl=s.fridge.tpl;state.isOwner=s.fridge.ownerId===meId;
-  state.members=s.members.map(function(m,i){return {id:uidMap(m.id),tgId:m.id,name:m.id===meId?'Вы':m.name,role:m.role,tone:i%3,bot:m.id===meId?true:m.bot}});
-  state.products=s.products.map(function(p){return {id:p.id,name:p.name,e:p.e,c:p.c,exp:p.exp,q:p.q,u:p.u,by:uidMap(p.added_by),added:p.added}});
+  state.members=s.members.map(function(m,i){return {id:uidMap(m.id),tgId:m.id,name:m.id===meId?'Вы':m.name,real:m.name,nick:m.nick,tgName:m.tgName,photoV:m.photoV,role:m.role,tone:i%3,bot:m.id===meId?true:m.bot}});
+  state.products=s.products.map(function(p){return {id:p.id,name:p.name,e:p.e,c:p.c,exp:p.exp,made:p.made,sn:p.sn,su:p.su,q:p.q,u:p.u,by:uidMap(p.added_by),added:p.added}});
+  state.admin=!!s.admin;state.newsRead=s.me.newsRead||[];
+  ensurePhotos();
   state.asks=s.asks.map(function(a){return {id:a.id,from:uidMap(a.from_id),to:a.to_ids.map(uidMap),name:a.name,q:a.q,u:a.u,note:a.note,done:a.done}});
   state.notify={on:s.me.notify.on,days:s.me.notify.days,time:s.me.notify.time,who:'me'};
   state.pending=!!s.invite;state.liveInvite=s.invite?s.invite.token:null;
   state.nextId=1e9;state.nextAsk=1e9;
 }
-function busyUI(){return !($('#form').hidden&&$('#ask').hidden&&$('#dates').hidden&&$('#tpl').hidden&&$('#sheet').hidden)}
+function busyUI(){return !($('#form').hidden&&$('#ask').hidden&&$('#dates').hidden&&$('#tpl').hidden&&$('#admin').hidden&&$('#sheet').hidden)}
 function loadLive(first,force){
   apiCall('GET','/state').then(function(s){
     if(s.needConsent){showConsent(s.name);return}
@@ -1179,7 +1493,7 @@ document.addEventListener('click',function(e){
    case 'ob-example':seed();state.rev={};setView('main');setTab('products');break;
    case 'open-dates':openDates(el.dataset.id);break;
    case 'close-dates':closeDates();break;
-   case 'dset':var dp=findP(id);if(dp){var tg=addDays(Number(el.dataset.d));dp.exp=(dp.exp===tg)?null:tg;renderDates();sync('PATCH','/products/'+dp.id,{exp:dp.exp})}break;
+   case 'dset':var dp=findP(id);if(dp){var tg=addDays(Number(el.dataset.d));dp.exp=(dp.exp===tg)?null:tg;dp.made=dp.sn=dp.su=null;renderDates();sync('PATCH','/products/'+dp.id,{exp:dp.exp,made:null,sn:null,su:null})}break;
    case 'ask-open':openAsk();break;
    case 'ask-close':closeAsk();break;
    case 'ask-send':sendAsk();break;
@@ -1227,7 +1541,21 @@ document.addEventListener('click',function(e){
    case 'invite-refresh':state.token=mkToken();renderFamily();toast('Новая ссылка готова. Старая больше не работает');break;
    case 'pend-revoke':state.pending=false;renderFamily();renderProducts();toast('Приглашение отозвано');break;
    case 'demo-join':state.pending=false;state.members.push({id:'sasha',name:'Саша',role:'member',tone:1,bot:true});renderFamily();renderProducts();toast('Саша теперь в холодильнике');break;
-   case 'member-open':var m=member(id),n=state.products.filter(function(p){return p.by===id}).length;
+   case 'member-open':profileSheet(id);break;
+   case 'pf-pick':$('#pfFile').click();break;
+   case 'pf-clear':pf.photo=null;pfPreview();break;
+   case 'pf-save':saveProfile();break;
+   case 'news':openNews();break;
+   case 'news-go':newsGo(el.dataset.go);break;
+   case 'admin-open':openAdmin();break;
+   case 'admin-close':closeAdmin();break;
+   case 'admin-refresh':loadAdmin();break;
+   case 'admin-bot':if(TGW&&TGW.openTelegramLink)TGW.openTelegramLink('https://t.me/'+(state.botName||'friidge_bot'));break;
+   case 'note-add':case 'note-edit':case 'note-cancel':case 'note-save':case 'note-del':noteAct(a,id,el);break;
+   case 'fmode':if(form){form.mode=el.dataset.m;if(form.mode==='made'&&!form.made)form.made=addDays(0);refreshForm()}break;
+   case 'fmq':form.made=addDays(Number(el.dataset.d));refreshForm();break;
+   case 'fshelf':form.sn=el.dataset.n;form.su=el.dataset.u;refreshForm();break;
+   case 'member-ask':var m=member(id),n=state.products.filter(function(p){return p.by===id}).length;
      openSheet('<div class="gut"><div class="grab"></div><h3 id="shTitle" style="font-size:21px;font-weight:700">Убрать '+esc(m.name)+'?</h3><p class="sh-p">'+esc(m.name)+' перестанет видеть продукты и получать напоминания. '+(n?'Добавленные продукты ('+n+') останутся в холодильнике.':'')+'</p><div class="sh-actions"><button class="btn danger" data-act="member-remove" data-id="'+id+'">Убрать из холодильника</button><button class="btn text" data-act="close-sheet">Отмена</button></div></div>');break;
    case 'member-remove':var rm=member(id);state.members=state.members.filter(function(x){return x.id!==id});closeSheet();renderFamily();renderProducts();toast(rm.name+' больше не в холодильнике');break;
    case 'notify-toggle':state.notify.on=!state.notify.on;renderNotify();sync('PATCH','/me/notify',{on:state.notify.on});break;
@@ -1249,13 +1577,23 @@ document.addEventListener('input',function(e){
   if(e.target.id==='fridgeName'){state.fridge=e.target.value.trim()||'Наш холодильник';$('#fridgeTitle').textContent=state.fridge;syncLater('fname','PATCH','/fridge',function(){return {name:state.fridge}})}
 });
 document.addEventListener('change',function(e){
-  if(e.target.dataset&&e.target.dataset.dateFor){var cp=findP(e.target.dataset.dateFor);if(cp){cp.exp=e.target.value||null;renderDates();sync('PATCH','/products/'+cp.id,{exp:cp.exp})}return}
+  if(e.target.dataset&&e.target.dataset.dateFor){var cp=findP(e.target.dataset.dateFor);if(cp){cp.exp=e.target.value||null;cp.made=cp.sn=cp.su=null;renderDates();sync('PATCH','/products/'+cp.id,{exp:cp.exp,made:null,sn:null,su:null})}return}
   if(e.target.id==='fDate'&&form){form.exp=e.target.value;form.dateTouched=true;refreshForm()}
   if(e.target.id==='askUnit'&&ask){ask.u=e.target.value;ask.qtyTouched=true;var ss=STEP[ask.u]||1;if(ask.q<ss)ask.q=ss;renderAsk()}
   if(e.target.id==='fUnit'&&form){form.u=e.target.value;form.qtyTouched=true;var s=STEP[form.u]||1;if(form.q<s)form.q=s;refreshForm()}
 });
+document.addEventListener('input',function(e){
+  if(!form)return;
+  if(e.target.id==='fShelfN'){var v=e.target.value.replace(/\D/g,'').slice(0,3);if(v!==e.target.value)e.target.value=v;form.sn=v;refreshForm()}
+});
+document.addEventListener('change',function(e){
+  if(e.target.id==='pfFile'&&pf){var f=e.target.files&&e.target.files[0];e.target.value='';if(!f)return;photoFromFile(f).then(function(d){pf.photo=d;pfPreview()}).catch(function(){toast('Не получилось открыть эту фотографию. Попробуй другую.')});return}
+  if(!form)return;
+  if(e.target.id==='fMade'){form.made=e.target.value;refreshForm()}
+  if(e.target.id==='fShelfU'){form.su=e.target.value;refreshForm()}
+});
 document.addEventListener('keydown',function(e){
-  if(e.key==='Escape'){if(!$('#tpl').hidden)closeTpl();else if(!$('#ask').hidden)closeAsk();else if(!$('#dates').hidden)closeDates();else if(!$('#sheet').hidden)closeSheet();else if(!$('#form').hidden)closeForm()}
+  if(e.key==='Escape'){if(!$('#tpl').hidden)closeTpl();else if(!$('#admin').hidden)closeAdmin();else if(!$('#ask').hidden)closeAsk();else if(!$('#dates').hidden)closeDates();else if(!$('#sheet').hidden)closeSheet();else if(!$('#form').hidden)closeForm()}
   if(e.key==='Enter'&&e.target.id==='askName'){e.preventDefault();e.target.blur();return}
   if(e.key==='Enter'&&e.target.id==='otherName'){e.preventDefault();addCustom();return}
   if(e.key==='Enter'&&e.target.id==='fName'&&form){e.preventDefault();var m=findMatches(form.name);if(m.length&&form.name.trim().length<3){applyEntry(m[0],true)}saveForm(false)}
