@@ -130,6 +130,7 @@ function initData(user, ageSec = 0, extra = {}) {
   await call(KAROLINA, 'POST', '/api/products', { items: [{ name: 'Творог', e: '🥛', c: 'dairy', q: 200, u: 'г', exp: plus(1) }, { name: 'Кефир', e: '🥛', c: 'dairy', q: 1, u: 'л', exp: plus(-1) }] });
   const t = C.mskNow('Europe/Moscow').time;
   S.db.prepare('UPDATE users SET notify_time=? WHERE id=101').run(t);
+  S.db.prepare("UPDATE users SET notify_time='23:59' WHERE id<>101").run(); // остальные не должны попасть в окно, зависящее от часа запуска
   assert.equal(C.queueReminders(S.db, S.cfg), 1); assert.equal(C.queueReminders(S.db, S.cfg), 0); ok('сводка ставится один раз в день');
   S.db.prepare('UPDATE outbox SET next_at=0').run(); await flush(S.db, tg);
   const dg = sent.find((m) => m.chat_id === 101 && /Скоро испортится/.test(m.text));
