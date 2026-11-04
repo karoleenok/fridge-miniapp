@@ -45,15 +45,37 @@ function makeTg(cfg, log) {
 const BACKOFF = [20, 60, 120, 300, 600, 1200, 1800];
 const GIVE_UP_MS = 24 * 3600 * 1000;
 
-function enqueue(db, chatId, text, markup, dedup) {
+// extra: { kind: 'photo'|'album', media: [file_id...], ents: [...] } — для рассылок с картинками и форматированием
+function enqueue(db, chatId, text, markup, dedup, extra) {
   try {
-    db.prepare('INSERT INTO outbox(chat_id,text,markup,dedup,created_at) VALUES(?,?,?,?,?)')
-      .run(chatId, text, markup ? JSON.stringify(markup) : null, dedup || null, Date.now());
+    const x = extra || {};
+    db.prepare('INSERT INTO outbox(chat_id,text,markup,dedup,created_at,kind,media,ents) VALUES(?,?,?,?,?,?,?,?)')
+      .run(chatId, text, markup ? JSON.stringify(markup) : null, dedup || null, Date.now(), x.kind || 'text',
+        x.media && x.media.length ? JSON.stringify(x.media) : null, x.ents && x.ents.length ? JSON.stringify(x.ents) : null);
     return true;
   } catch (e) {
     if (String(e.message).includes('UNIQUE')) return false; // уже в очереди — не дублируем
     throw e;
   }
+}
+
+// Как отправить строку очереди: обычным сообщением, одной картинкой или альбомом
+function buildCall(m) {
+  const ents = m.ents ? JSON.parse(m.ents) : null, media = m.media ? JSON.parse(m.media) : [];
+  if (m.kind === 'photo' && media.length) {
+    const body = { chat_id: m.chat_id, photo: media[0] };
+    if (m.text) { body.caption = m.text; if (ents) body.caption_entities = ents; }
+    if (m.markup) body.reply_markup = JSON.parse(m.markup);
+    return { method: 'sendPhoto', body };
+  }
+  if (m.kind === 'album' && media.length > 1) {
+    const arr = media.map((f, i) => (i === 0 && m.text ? { type: 'photo', media: f, caption: m.text, ...(ents ? { caption_entities: ents } : {}) } : { type: 'photo', media: f }));
+    return { method: 'sendMediaGroup', body: { chat_id: m.chat_id, media: arr } };
+  }
+  const body = { chat_id: m.chat_id, text: m.text, link_preview_options: { is_disabled: true } };
+  if (ents) body.entities = ents;
+  if (m.markup) body.reply_markup = JSON.parse(m.markup);
+  return { method: 'sendMessage', body };
 }
 
 let busy = false;
@@ -64,9 +86,8 @@ async function flush(db, tg, now = Date.now()) {
   try {
     const due = db.prepare('SELECT * FROM outbox WHERE sent_at IS NULL AND failed IS NULL AND next_at<=? ORDER BY id LIMIT 25').all(now);
     for (const m of due) {
-      const body = { chat_id: m.chat_id, text: m.text, link_preview_options: { is_disabled: true } };
-      if (m.markup) body.reply_markup = JSON.parse(m.markup);
-      const r = await tg.call('sendMessage', body);
+      const { method, body } = buildCall(m);
+      const r = await tg.call(method, body);
       if (r.ok) {
         db.prepare("UPDATE outbox SET sent_at=datetime('now') WHERE id=?").run(m.id);
         sent++;
@@ -98,4 +119,4 @@ async function flush(db, tg, now = Date.now()) {
   return sent;
 }
 
-module.exports = { makeTg, enqueue, flush, BACKOFF };
+module.exports = { makeTg, enqueue, flush, buildCall, BACKOFF };

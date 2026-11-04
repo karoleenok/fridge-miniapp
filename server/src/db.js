@@ -72,7 +72,43 @@ function open(file) {
     CREATE INDEX IF NOT EXISTS outbox_due ON outbox(sent_at, failed, next_at);
     CREATE TABLE IF NOT EXISTS kv(k TEXT PRIMARY KEY, v TEXT);
   `);
+  migrate(db);
   return db;
 }
 
-module.exports = { open };
+// Новые колонки для уже работающей базы: CREATE TABLE IF NOT EXISTS старые таблицы не трогает.
+function addCol(db, table, col, def) {
+  const have = db.prepare(`PRAGMA table_info(${table})`).all().some((c) => c.name === col);
+  if (!have) db.exec(`ALTER TABLE ${table} ADD COLUMN ${col} ${def}`);
+}
+function migrate(db) {
+  addCol(db, 'members', 'nick', 'TEXT');             // ник в этом холодильнике (если пусто, берём имя из Telegram)
+  addCol(db, 'members', 'photo', 'TEXT');            // фото-квадрат 256 px, JPEG в виде data-url
+  addCol(db, 'members', 'photo_v', 'INTEGER NOT NULL DEFAULT 0'); // растёт при каждой смене фото
+  addCol(db, 'products', 'made', 'TEXT');            // дата производства
+  addCol(db, 'products', 'shelf_n', 'INTEGER');      // срок годности: число
+  addCol(db, 'products', 'shelf_u', 'TEXT');         // срок годности: единица (д, нед, мес, год)
+  addCol(db, 'users', 'news_read', 'TEXT');          // какие новости уже прочитаны (JSON)
+  addCol(db, 'users', 'news_off', 'INTEGER NOT NULL DEFAULT 0'); // отказался от рассылки владельца (/news)
+  addCol(db, 'users', 'seen_at', 'TEXT');            // когда в последний раз открывал приложение
+  addCol(db, 'outbox', 'kind', "TEXT NOT NULL DEFAULT 'text'");  // text | photo | album
+  addCol(db, 'outbox', 'media', 'TEXT');             // file_id картинок (JSON)
+  addCol(db, 'outbox', 'ents', 'TEXT');              // форматирование текста (JSON)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS notes(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      text TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    CREATE TABLE IF NOT EXISTS broadcasts(
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      text TEXT NOT NULL DEFAULT '', ents TEXT, media TEXT NOT NULL DEFAULT '[]',
+      state TEXT NOT NULL DEFAULT 'draft',   -- draft | sending | done | cancelled
+      total INTEGER NOT NULL DEFAULT 0, ok INTEGER NOT NULL DEFAULT 0, fail INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')), sent_at TEXT
+    );
+  `);
+}
+
+module.exports = { open, migrate };

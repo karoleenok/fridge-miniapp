@@ -6,8 +6,9 @@ const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
 const { open } = require('./db');
-const { makeTg, enqueue, flush } = require('./tg');
+const { makeTg, enqueue, flush, buildCall } = require('./tg');
 const C = require('./core');
+const A = require('./admin');
 const { loadToken, makeClaim } = require('./claim');
 
 const cfg = {
@@ -24,7 +25,8 @@ const cfg = {
   TZ: process.env.TZ_NAME || 'Europe/Moscow',
   OWNER_INFO: process.env.OWNER_INFO || '',
   CONTACT: process.env.CONTACT || '',
-  BOT_USERNAME: process.env.BOT_USERNAME || ''
+  BOT_USERNAME: process.env.BOT_USERNAME || '',
+  OWNER_ID: Number(process.env.OWNER_ID || 0) // Telegram-id владельца бота: ему доступны /send, /stats, заметки
 };
 cfg.BOT_TOKEN = loadToken(cfg); // из переменной окружения или из файла, сохранённого одноразовой страницей /claim
 
@@ -75,7 +77,8 @@ function limited(key, max, windowMs) {
 setInterval(() => { const now = Date.now(); for (const [k, v] of hits) if (now - v.t > 120000) hits.delete(k); }, 60000).unref();
 
 /* ---------- API мини-аппа ---------- */
-const full = (uid) => Object.assign(C.stateFor(db, uid), { bot: botUsername || 'friidge_bot' });
+const isOwner = (id) => !!cfg.OWNER_ID && id === cfg.OWNER_ID;
+const full = (uid) => Object.assign(C.stateFor(db, uid), { bot: botUsername || 'friidge_bot', admin: isOwner(uid) });
 function authUser(req) {
   const raw = req.headers['x-init-data'];
   const r = C.checkInitData(Array.isArray(raw) ? raw[0] : raw, cfg.BOT_TOKEN);
@@ -89,20 +92,23 @@ async function api(req, res, url) {
   const auth = authUser(req);
   const tgUser = auth.user;
   if (limited('u' + tgUser.id, 120, 60000)) throw new C.HttpError(429, 'Слишком часто. Подожди минуту.');
-  const body = m === 'GET' || m === 'DELETE' ? {} : await readBody(req);
+  const body = m === 'GET' || m === 'DELETE' ? {} : await readBody(req, /^\/members\/\d+\/photo$/.test(p) ? 220 * 1024 : undefined);
   const canDm = tgUser.allows_write_to_pm === true;
 
   // До согласия ничего не храним: только отвечаем, что оно нужно
   if (m === 'POST' && p === '/consent') {
+    const had = !!(C.getUser(db, tgUser.id) || {}).consent_at;
     db.exec('BEGIN');
     try { C.upsertUser(db, tgUser, { consent: true, canDm }); C.ensureFridge(db, tgUser.id); db.exec('COMMIT'); }
     catch (e) { db.exec('ROLLBACK'); throw e; }
+    if (!had) tellOwnerNew(tgUser.id);
     return send(res, 200, full(tgUser.id));
   }
   const u = C.getUser(db, tgUser.id);
   if (!u || !u.consent_at) return send(res, 200, { needConsent: true, name: String(tgUser.first_name || '').slice(0, 64) });
   C.upsertUser(db, tgUser, { canDm });
   const uid = tgUser.id;
+  touchSeen(uid);
 
   if (m === 'GET' && p === '/state') return send(res, 200, full(uid));
   if (m === 'POST' && p === '/products') return send(res, 200, { ids: C.addProducts(db, uid, body.items) });
@@ -147,6 +153,31 @@ async function api(req, res, url) {
     C.leaveFridge(db, target);
     return send(res, 200, { ok: true });
   }
+  if ((mm = p.match(/^\/members\/(\d+)$/)) && m === 'PATCH') {
+    const nick = C.setNick(db, uid, Number(mm[1]), body.nick);
+    return send(res, 200, { ok: true, nick });
+  }
+  if ((mm = p.match(/^\/members\/(\d+)\/photo$/))) {
+    if (m === 'GET') return send(res, 200, { photo: C.getPhoto(db, uid, Number(mm[1])) });
+    if (m === 'PUT') {
+      if (limited('ph' + uid, 30, 3600000)) throw new C.HttpError(429, 'Слишком много смен фото. Подожди час.');
+      C.setPhoto(db, uid, Number(mm[1]), body.photo);
+      return send(res, 200, { ok: true });
+    }
+  }
+  if (p === '/admin' || p.startsWith('/admin/')) {
+    if (!isOwner(uid)) throw new C.HttpError(404, 'нет такого адреса');
+    try {
+      if (m === 'GET' && p === '/admin') return send(res, 200, adminSnapshot());
+      if (m === 'POST' && p === '/admin/notes') { const id = A.notes.add(db, body.text); return send(res, 200, { id }); }
+      if ((mm = p.match(/^\/admin\/notes\/(\d+)$/))) {
+        if (m === 'PATCH') { A.notes.edit(db, mm[1], body.text); return send(res, 200, { ok: true }); }
+        if (m === 'DELETE') { A.notes.del(db, mm[1]); return send(res, 200, { ok: true }); }
+      }
+    } catch (e) { if (e instanceof C.HttpError) throw e; throw new C.HttpError(400, e.message); }
+    throw new C.HttpError(404, 'нет такого адреса');
+  }
+  if (m === 'POST' && p === '/news-read') return send(res, 200, { read: C.markNewsRead(db, uid, body.ids) });
   if (m === 'POST' && p === '/leave') {
     const left = C.leaveFridge(db, uid);
     if (left && left.empty) db.prepare('DELETE FROM fridges WHERE id=?').run(left.fridgeId);
@@ -190,9 +221,132 @@ function afterJoin(uid, r) {
   };
   say(uid, msgs[r.reason] || msgs.bad, r.ok ? appButton() : null);
   if (r.reason === 'joined' && r.inviter) {
-    const inv = C.getUser(db, r.inviter), me = C.getUser(db, uid);
-    if (inv && inv.can_dm) say(r.inviter, `${me.first_name} теперь в вашем холодильнике.`, null);
+    const inv = C.getUser(db, r.inviter);
+    if (inv && inv.can_dm) say(r.inviter, `${C.displayName(db, uid)} теперь в вашем холодильнике.`, null);
   }
+}
+
+/* ---------- владелец: рассылка, статистика, заметки ---------- */
+const seenAt = new Map();
+function touchSeen(uid) {
+  const now = Date.now();
+  if (now - (seenAt.get(uid) || 0) < 10 * 60 * 1000) return;
+  seenAt.set(uid, now);
+  db.prepare("UPDATE users SET seen_at=datetime('now') WHERE id=?").run(uid);
+}
+function tellOwnerNew(uid) {
+  if (!cfg.OWNER_ID || uid === cfg.OWNER_ID) return;
+  const u = C.getUser(db, uid), total = db.prepare('SELECT count(*) n FROM users WHERE consent_at IS NOT NULL').get().n;
+  enqueue(db, cfg.OWNER_ID, `Новый человек во Фридже: ${u ? u.first_name : uid}. Всего: ${total}.`, null, 'new:' + uid);
+}
+function adminSnapshot() {
+  return {
+    stats: A.stats(db),
+    notes: A.notes.list(db),
+    posts: db.prepare("SELECT id,substr(text,1,80) text,state,total,ok,fail,created_at FROM broadcasts WHERE state<>'cancelled' ORDER BY id DESC LIMIT 10").all()
+  };
+}
+
+const ownerHelp = 'Команды владельца:\n\n/send текст — собрать пост для всех. Потом можно прислать до 10 картинок.\n/stats — кто присоединился\n/note текст — записать заметку\n/notes — все заметки, их можно править\n/whoami — твой Telegram id';
+const sendHelp = 'Как отправить пост:\n\n1) /send и текст. Жирный, ссылки и курсив сохранятся.\n2) Потом пришли картинки, до 10 штук (можно альбомом).\n3) Нажми «Показать», проверь и подтверди.\n\nМожно сразу картинку с подписью, которая начинается с /send.';
+const bcKb = [[{ text: 'Показать, как увидят люди', callback_data: 'bc:show' }], [{ text: 'Отменить черновик', callback_data: 'bc:no' }]];
+const reply = (chatId, text, markup) => tg.call('sendMessage', Object.assign({ chat_id: chatId, text, link_preview_options: { is_disabled: true } }, markup ? { reply_markup: markup } : {}));
+
+function notesKb(list) {
+  return { inline_keyboard: list.slice(0, 8).map((n) => [{ text: '✏️ #' + n.id, callback_data: 'nt:e:' + n.id }, { text: '🗑 #' + n.id, callback_data: 'nt:d:' + n.id }]) };
+}
+async function showNotes(chatId) {
+  const list = A.notes.list(db);
+  if (!list.length) return reply(chatId, 'Заметок пока нет. Запиши: /note текст');
+  return reply(chatId, 'Заметки (' + list.length + '):\n\n' + list.slice(0, 20).map(A.noteLine).join('\n') + (list.length > 8 ? '\n\nКнопки есть у первых 8. Остальные правятся в приложении, раздел «Для владельца».' : ''), notesKb(list));
+}
+let lastGroup = '';
+
+// Возвращает true, если сообщение разобрано как команда владельца
+async function ownerMessage(msg) {
+  const chatId = msg.chat.id, raw = String(msg.text || msg.caption || '');
+  const editing = db.prepare("SELECT v FROM kv WHERE k='edit-note'").get();
+  if (/^\/cancel/.test(raw)) { db.prepare("DELETE FROM kv WHERE k='edit-note'").run(); await reply(chatId, 'Хорошо, ничего не меняю.'); return true; }
+  if (/^\/admin/.test(raw)) { await reply(chatId, ownerHelp); return true; }
+  if (/^\/stats/.test(raw)) { await reply(chatId, A.statsText(A.stats(db))); return true; }
+  if (/^\/notes/.test(raw)) { await showNotes(chatId); return true; }
+  let mm = raw.match(/^\/note(?:@\w+)?\s+([\s\S]+)/);
+  if (mm) { try { const id = A.notes.add(db, mm[1]); await reply(chatId, 'Записала заметку #' + id + '. Все заметки: /notes'); } catch (e) { await reply(chatId, e.message); } return true; }
+  if (/^\/note(?:@\w+)?\s*$/.test(raw)) { await reply(chatId, 'Напиши заметку после команды: /note купить фильтр для воды'); return true; }
+  if (editing && raw && !raw.startsWith('/')) {
+    db.prepare("DELETE FROM kv WHERE k='edit-note'").run();
+    try { A.notes.edit(db, editing.v, raw); await reply(chatId, 'Заметка #' + editing.v + ' обновлена.'); } catch (e) { await reply(chatId, e.message); }
+    return true;
+  }
+  const isSend = /^\/send(@\w+)?(\s|$)/.test(raw);
+  const d0 = A.draft(db);
+  if (isSend || (msg.photo && d0)) {
+    const post = A.parsePost(msg, isSend);
+    if (isSend && !post.text && !post.pic) { await reply(chatId, sendHelp); return true; }
+    if (!isSend && d0 && d0.text) { post.text = ''; post.ents = []; } // подпись к картинке не затирает уже написанный текст
+    const d = A.saveDraft(db, post, isSend);
+    if (d.full) { await reply(chatId, 'В посте уже ' + A.MAX_PICS + ' картинок, больше нельзя.'); return true; }
+    const gid = msg.media_group_id || '';
+    if (gid && gid === lastGroup) return true; // альбом приходит по одной картинке: отвечаем один раз
+    lastGroup = gid;
+    const n = JSON.parse(d.media).length;
+    await reply(chatId, 'Черновик собран. Текст: ' + d.text.length + ' знаков, картинок: ' + n + '.\nМожно прислать ещё картинки, потом нажми «Показать».', bcKb);
+    return true;
+  }
+  return false;
+}
+
+async function ownerCallback(q, d, answer) {
+  const chatId = q.message.chat.id, mid = q.message.message_id;
+  if (d === 'bc:show') {
+    const b = A.draft(db);
+    if (!b) { await answer('Черновика нет'); return reply(chatId, 'Черновика нет. Начни с /send'); }
+    await answer();
+    for (const r of A.postRows(b, cfg.PUBLIC_URL)) {
+      const { method, body } = buildCall({ chat_id: chatId, text: r.text, markup: r.kb ? JSON.stringify(r.kb) : null, kind: r.kind, media: JSON.stringify(r.media), ents: r.ents.length ? JSON.stringify(r.ents) : null });
+      await tg.call(method, body);
+    }
+    const chk = A.checkDraft(b), aud = A.audience(db, cfg.OWNER_ID);
+    const L = ['Проверка перед отправкой', '', 'Текст: ' + (b.text ? b.text.length + ' знаков' : 'нет'), 'Картинок: ' + chk.media,
+      'Получат: ' + aud.ids.length + ' ' + A.plural(aud.ids.length, 'человек', 'человека', 'человек'),
+      'Не получат: ' + aud.skip + ' (не нажимали Старт или отключили рассылку)'];
+    if (b.text.length > A.CAP && chk.media) L.push('Текст длиннее подписи, придёт отдельным сообщением под картинками.');
+    chk.bad.forEach((x) => L.push('⚠️ ' + x));
+    if (!aud.ids.length) L.push('⚠️ Отправлять некому.');
+    const ok = !chk.bad.length && aud.ids.length;
+    return reply(chatId, L.join('\n'), { inline_keyboard: (ok ? [[{ text: 'Отправить ' + aud.ids.length + ' ' + A.plural(aud.ids.length, 'человеку', 'людям', 'людям'), callback_data: 'bc:go:' + b.id }]] : []).concat([[{ text: 'Отменить', callback_data: 'bc:no' }]]) });
+  }
+  let mm;
+  if ((mm = d.match(/^bc:go:(\d+)$/))) {
+    const b = A.draft(db);
+    if (!b || b.id !== Number(mm[1])) return answer('Этот черновик уже не актуален');
+    await answer('Отправляю');
+    tg.call('editMessageReplyMarkup', { chat_id: chatId, message_id: mid, reply_markup: { inline_keyboard: [] } });
+    const aud = A.startSending(db, b, cfg.OWNER_ID, cfg.PUBLIC_URL);
+    return reply(chatId, 'Отправляю ' + aud.ids.length + ' ' + A.plural(aud.ids.length, 'человеку', 'людям', 'людям') + '. Когда всё уйдёт, пришлю отчёт.');
+  }
+  if (d === 'bc:no') {
+    db.prepare("UPDATE broadcasts SET state='cancelled' WHERE state='draft'").run();
+    tg.call('editMessageReplyMarkup', { chat_id: chatId, message_id: mid, reply_markup: { inline_keyboard: [] } });
+    await answer('Отменено');
+    return reply(chatId, 'Черновик отменён, никому ничего не ушло.');
+  }
+  if ((mm = d.match(/^nt:e:(\d+)$/))) {
+    db.prepare("INSERT INTO kv(k,v) VALUES('edit-note',?) ON CONFLICT(k) DO UPDATE SET v=excluded.v").run(mm[1]);
+    await answer();
+    const n = db.prepare('SELECT text FROM notes WHERE id=?').get(Number(mm[1]));
+    return reply(chatId, n ? 'Сейчас в заметке #' + mm[1] + ':\n\n' + n.text + '\n\nПришли новый текст одним сообщением. /cancel, чтобы не менять.' : 'Такой заметки уже нет.');
+  }
+  if ((mm = d.match(/^nt:d:(\d+)$/))) {
+    await answer();
+    return reply(chatId, 'Удалить заметку #' + mm[1] + '?', { inline_keyboard: [[{ text: 'Да, удалить', callback_data: 'nt:y:' + mm[1] }, { text: 'Нет', callback_data: 'cancel' }]] });
+  }
+  if ((mm = d.match(/^nt:y:(\d+)$/))) {
+    A.notes.del(db, mm[1]);
+    await answer('Удалено');
+    return reply(chatId, 'Заметка #' + mm[1] + ' удалена.');
+  }
+  return false;
 }
 
 async function onUpdate(up) {
@@ -200,6 +354,13 @@ async function onUpdate(up) {
     if (up.message && up.message.chat && up.message.chat.type === 'private' && up.message.from) {
       const from = up.message.from, text = String(up.message.text || '');
       const u = C.getUser(db, from.id);
+      if (/^\/whoami/.test(text)) return reply(from.id, 'Твой Telegram id: ' + from.id);
+      if (/^\/news/.test(text) && u) {
+        const off = u.news_off ? 0 : 1;
+        db.prepare('UPDATE users SET news_off=? WHERE id=?').run(off, from.id);
+        return reply(from.id, off ? 'Больше не буду присылать новости. Вернуть: снова /news.' : 'Хорошо, новости снова буду присылать.');
+      }
+      if (isOwner(from.id) && (await ownerMessage(up.message))) return;
       const mm = text.match(/^\/start(?:@\w+)?(?:\s+(\S+))?/);
       if (mm) {
         const payload = mm[1] && /^inv_[\w-]{8,40}$/.test(mm[1]) ? mm[1] : '';
@@ -222,8 +383,11 @@ async function onUpdate(up) {
     if (up.callback_query) {
       const q = up.callback_query, uid = q.from.id, d = String(q.data || '');
       const answer = (text) => tg.call('answerCallbackQuery', { callback_query_id: q.id, text: text || '' });
+      if (isOwner(uid) && /^(bc|nt):/.test(d) && q.message) return ownerCallback(q, d, answer);
       if (d === 'agree' || d.startsWith('agree:')) {
+        const had = !!(C.getUser(db, uid) || {}).consent_at;
         C.upsertUser(db, q.from, { consent: true, canDm: true });
+        if (!had) tellOwnerNew(uid);
         C.ensureFridge(db, uid);
         await answer('Спасибо!');
         const payload = d.slice(6);
@@ -283,8 +447,9 @@ function policyPage() {
 <style>body{font:16px/1.55 system-ui,-apple-system,sans-serif;max-width:680px;margin:0 auto;padding:24px 16px;color:#0B0D12;background:#fff}h1{font-size:24px}h2{font-size:18px;margin-top:28px}</style>
 <h1>Политика обработки персональных данных и согласие</h1>
 <p>Оператор: ${owner}. Контакт: ${contact}.</p>
-<h2>Какие данные</h2><p>Telegram-id и имя из профиля Telegram; продукты, сроки, просьбы купить и настройки напоминаний, которые вы вводите сами.</p>
+<h2>Какие данные</h2><p>Telegram-id и имя из профиля Telegram; ник и фото, если вы сами их задали; продукты, сроки, просьбы купить и настройки напоминаний, которые вы вводите сами.</p>
 <h2>Зачем</h2><p>Чтобы показывать содержимое холодильника вам и участникам вашей семьи, присылать напоминания о сроках и просьбы купить.</p>
+<h2>Сообщения от оператора</h2><p>Иногда оператор присылает новости о сервисе. Отказаться можно в любой момент командой /news в боте.</p>
 <h2>Где хранятся</h2><p>На сервере в Российской Федерации. Сообщения доставляются через Telegram.</p>
 <h2>Сколько хранятся</h2><p>Пока вы пользуетесь сервисом. Удалить свои данные можно командой /delete_me в боте или написав оператору.</p>
 <h2>Согласие</h2><p>Нажимая «Согласен(на)» в боте или в приложении, вы даёте согласие на обработку перечисленных данных для указанных целей. Согласие можно отозвать: /delete_me.</p>
@@ -305,6 +470,7 @@ async function doSetup() {
   else out.push(await tg.call('deleteWebhook', {}));
   out.push(await tg.call('setChatMenuButton', { menu_button: { type: 'web_app', text: 'Холодильник', web_app: { url: cfg.PUBLIC_URL } } }));
   out.push(await tg.call('setMyCommands', { commands: [{ command: 'start', description: 'Открыть холодильник' }, { command: 'stop', description: 'Не присылать сообщения' }, { command: 'delete_me', description: 'Удалить мои данные' }] }));
+  if (cfg.OWNER_ID) out.push(await tg.call('setMyCommands', { scope: { type: 'chat', chat_id: cfg.OWNER_ID }, commands: [{ command: 'start', description: 'Открыть холодильник' }, { command: 'send', description: 'Собрать пост для всех' }, { command: 'stats', description: 'Кто присоединился' }, { command: 'note', description: 'Записать заметку' }, { command: 'notes', description: 'Все заметки' }, { command: 'admin', description: 'Команды владельца' }] }));
   return out.map((r) => (r.ok ? 'ок' : 'ошибка: ' + r.description)).join('\n');
 }
 
@@ -360,6 +526,13 @@ function startLoops() {
   started = true;
   setInterval(() => { flush(db, tg).catch((e) => log('flush', e.message)); }, 5000);
   setInterval(() => { try { C.queueReminders(db, cfg); } catch (e) { log('reminders', e.message); } }, 60000);
+  setInterval(() => {
+    try {
+      for (const r of A.finishSending(db)) {
+        if (cfg.OWNER_ID) enqueue(db, cfg.OWNER_ID, `Рассылка закончена.\nДоставлено: ${r.ok} из ${r.total}.` + (r.fail ? `\nНе дошло: ${r.fail} (заблокировали бота или Telegram не ответил).` : ''), null, 'bcdone:' + r.id);
+      }
+    } catch (e) { log('broadcast', e.message); }
+  }, 60000);
   setInterval(() => { // уборка: отправленное старше 30 дней и использованные/просроченные приглашения
     db.prepare("DELETE FROM outbox WHERE (sent_at IS NOT NULL OR failed IS NOT NULL) AND created_at<?").run(Date.now() - 30 * 86400000);
     db.prepare('DELETE FROM invites WHERE expires_at<?').run(Date.now() - 7 * 86400000);

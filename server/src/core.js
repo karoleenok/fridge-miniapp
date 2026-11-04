@@ -52,9 +52,45 @@ const dateOrNull = (v) => {
   return v;
 };
 
+/* ---------- дата производства + срок годности ---------- */
+const SHELF_U = { 'д': 3650, 'нед': 520, 'мес': 120, 'год': 10 };
+const addDaysIso = (iso, n) => new Date(Date.parse(iso + 'T00:00:00Z') + n * 86400000).toISOString().slice(0, 10);
+// «+ N месяцев» по календарю: 31 января + 1 мес = 28 (29) февраля, а не 3 марта
+function addMonthsIso(iso, n) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const t = (y * 12 + (m - 1)) + n, ny = Math.floor(t / 12), nm = t % 12;
+  const last = new Date(Date.UTC(ny, nm + 1, 0)).getUTCDate();
+  return new Date(Date.UTC(ny, nm, Math.min(d, last))).toISOString().slice(0, 10);
+}
+function calcExp(made, n, u) {
+  if (u === 'д') return addDaysIso(made, n);
+  if (u === 'нед') return addDaysIso(made, n * 7);
+  if (u === 'мес') return addMonthsIso(made, n);
+  return addMonthsIso(made, n * 12);
+}
+// Что хранить по срокам. Если есть «изготовлено + срок», «годен до» считает сервер: клиенту не верим.
+function shelfFields(p, prev) {
+  const has = (k) => p[k] !== undefined;
+  if (!has('made') && !has('sn') && !has('su')) {
+    if (!has('exp')) return { exp: prev ? prev.exp : null, made: prev ? prev.made : null, sn: prev ? prev.shelf_n : null, su: prev ? prev.shelf_u : null };
+    return { exp: dateOrNull(p.exp), made: null, sn: null, su: null };
+  }
+  const made = dateOrNull(p.made);
+  if (!made) return { exp: has('exp') ? dateOrNull(p.exp) : null, made: null, sn: null, su: null };
+  const n = Number(p.sn), u = p.su;
+  if (!Number.isInteger(n) || n < 1 || !SHELF_U[u] || n > SHELF_U[u]) bad('срок годности');
+  if (made > addDaysIso(new Date().toISOString().slice(0, 10), 2)) bad('дата производства в будущем');
+  return { exp: calcExp(made, n, u), made, sn: n, su: u };
+}
+
 /* ---------- пользователи и холодильники ---------- */
 const getUser = (db, id) => db.prepare('SELECT * FROM users WHERE id=?').get(id);
 const membership = (db, uid) => db.prepare('SELECT * FROM members WHERE user_id=?').get(uid);
+// Как человека зовут в холодильнике: свой ник, а если его нет, имя из Telegram. Его же видят в сообщениях бота.
+const displayName = (db, uid) => {
+  const r = db.prepare('SELECT m.nick, u.first_name FROM users u LEFT JOIN members m ON m.user_id=u.id WHERE u.id=?').get(uid);
+  return r ? (r.nick || r.first_name || 'Без имени') : 'Без имени';
+};
 
 function upsertUser(db, tgUser, extra = {}) {
   const name = String(tgUser.first_name || '').slice(0, 64) || 'Без имени';
@@ -140,19 +176,20 @@ function stateFor(db, uid) {
   const u = getUser(db, uid);
   const fid = ensureFridge(db, uid);
   const f = db.prepare('SELECT * FROM fridges WHERE id=?').get(fid);
-  const members = db.prepare(`SELECT m.user_id id, m.role, u.first_name name, u.can_dm
+  const members = db.prepare(`SELECT m.user_id id, m.role, u.first_name name, u.can_dm, m.nick, m.photo_v, m.photo IS NOT NULL has_photo
     FROM members m JOIN users u ON u.id=m.user_id WHERE m.fridge_id=? ORDER BY m.role='owner' DESC, m.joined_at`).all(fid);
-  const products = db.prepare('SELECT id,name,e,c,exp,q,u,added_by,added FROM products WHERE fridge_id=? ORDER BY id').all(fid);
+  const products = db.prepare('SELECT id,name,e,c,exp,made,shelf_n sn,shelf_u su,q,u,added_by,added FROM products WHERE fridge_id=? ORDER BY id').all(fid);
   const asks = db.prepare(`SELECT * FROM (
       SELECT id,from_id,to_ids,name,q,u,note,done,done_by,created_at FROM asks WHERE fridge_id=? AND done=0
       UNION ALL SELECT * FROM (SELECT id,from_id,to_ids,name,q,u,note,done,done_by,created_at FROM asks WHERE fridge_id=? AND done=1 ORDER BY id DESC LIMIT 10)
     ) ORDER BY id`).all(fid, fid).map((a) => ({ ...a, to_ids: JSON.parse(a.to_ids), done: !!a.done }));
   const inv = pendingInvite(db, uid);
   return {
-    me: { id: uid, name: u.first_name, canDm: !!u.can_dm, onboarded: !!u.onboarded,
+    me: { id: uid, name: displayName(db, uid), canDm: !!u.can_dm, onboarded: !!u.onboarded,
+      newsRead: (() => { try { return JSON.parse(u.news_read || '[]'); } catch (e) { return []; } })(),
       notify: { on: !!u.notify_on, days: u.notify_days, time: u.notify_time } },
     fridge: { id: fid, name: f.name, tpl: f.tpl || DEFAULT_TPL, ownerId: f.owner_id },
-    members: members.map((m) => ({ id: m.id, name: m.name, role: m.role, bot: !!m.can_dm })),
+    members: members.map((m) => ({ id: m.id, name: m.nick || m.name, tgName: m.name, nick: m.nick || '', role: m.role, bot: !!m.can_dm, photoV: m.has_photo ? m.photo_v : 0 })),
     products, asks,
     invite: inv ? { token: inv.token, expiresAt: inv.expires_at } : null
   };
@@ -164,13 +201,14 @@ function addProducts(db, uid, list) {
   const fid = ensureFridge(db, uid);
   const count = db.prepare('SELECT count(*) n FROM products WHERE fridge_id=?').get(fid).n;
   if (count + list.length > 500) bad('слишком много продуктов в холодильнике');
-  const ins = db.prepare('INSERT INTO products(fridge_id,name,e,c,exp,q,u,added_by,added) VALUES(?,?,?,?,?,?,?,?,?)');
+  const ins = db.prepare('INSERT INTO products(fridge_id,name,e,c,exp,made,shelf_n,shelf_u,q,u,added_by,added) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)');
   const today = new Date().toISOString().slice(0, 10);
   const ids = [];
   db.exec('BEGIN');
   try {
     for (const p of list) {
-      const r = ins.run(fid, str(p.name, 40, 'название'), emoji(p.e), cat(p.c), dateOrNull(p.exp), qty(p.q), unit(p.u), uid, today);
+      const sh = shelfFields(p, null);
+      const r = ins.run(fid, str(p.name, 40, 'название'), emoji(p.e), cat(p.c), sh.exp, sh.made, sh.sn, sh.su, qty(p.q), unit(p.u), uid, today);
       ids.push(Number(r.lastInsertRowid));
     }
     db.exec('COMMIT');
@@ -191,11 +229,11 @@ function updateProduct(db, uid, id, b) {
     name: b.name !== undefined ? str(b.name, 40, 'название') : p.name,
     e: b.e !== undefined ? emoji(b.e) : p.e,
     c: b.c !== undefined ? cat(b.c) : p.c,
-    exp: b.exp !== undefined ? dateOrNull(b.exp) : p.exp,
+    ...(() => { const sh = shelfFields(b, p); return { exp: sh.exp, made: sh.made, sn: sh.sn, su: sh.su }; })(),
     q: b.q !== undefined ? qty(b.q) : p.q,
     u: b.u !== undefined ? unit(b.u) : p.u
   };
-  db.prepare('UPDATE products SET name=?,e=?,c=?,exp=?,q=?,u=? WHERE id=?').run(n.name, n.e, n.c, n.exp, n.q, n.u, p.id);
+  db.prepare('UPDATE products SET name=?,e=?,c=?,exp=?,made=?,shelf_n=?,shelf_u=?,q=?,u=? WHERE id=?').run(n.name, n.e, n.c, n.exp, n.made, n.sn, n.su, n.q, n.u, p.id);
 }
 
 function deleteProduct(db, uid, id) {
@@ -223,7 +261,7 @@ function createAsk(db, uid, b, cfg) {
     .run(m.fridge_id, uid, JSON.stringify(to), name, q, u, note);
   const askId = Number(r.lastInsertRowid);
   const f = db.prepare('SELECT tpl FROM fridges WHERE id=?').get(m.fridge_id);
-  const from = getUser(db, uid).first_name;
+  const from = displayName(db, uid);
   const text = renderAsk(f.tpl, from, name, q, u, note);
   const delivered = [];
   for (const id of to) {
@@ -246,11 +284,53 @@ function markAskDone(db, uid, id) {
   if (a.from_id !== uid) {
     const asker = getUser(db, a.from_id);
     if (asker && asker.can_dm) {
-      const who = getUser(db, uid).first_name;
+      const who = displayName(db, uid);
       enqueue(db, a.from_id, `${who} купил(а): ${a.name}, ${String(a.q).replace('.', ',')} ${a.u}`, null, 'done:' + a.id);
     }
   }
   return { already: false, ask: a };
+}
+
+/* ---------- ник и фото участника ---------- */
+// Менять можно себя; владелец холодильника может поправить любого из своей семьи.
+function profileTarget(db, actor, target) {
+  const a = membership(db, actor), t = membership(db, target);
+  if (!a || !t || a.fridge_id !== t.fridge_id) throw new HttpError(404, 'нет такого участника');
+  if (actor !== target && a.role !== 'owner') throw new HttpError(403, 'Менять других может только владелец');
+  return t;
+}
+function setNick(db, actor, target, nick) {
+  profileTarget(db, actor, target);
+  let v = nick == null ? '' : typeof nick === 'string' ? nick : bad('ник');
+  v = v.replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim();
+  if (v.length > 24) bad('Ник длиннее 24 знаков');
+  db.prepare('UPDATE members SET nick=? WHERE user_id=?').run(v || null, target);
+  return v;
+}
+const PHOTO_MAX = 150000; // знаков в data-url, это около 110 КБ
+function setPhoto(db, actor, target, dataUrl) {
+  profileTarget(db, actor, target);
+  if (dataUrl == null) { db.prepare('UPDATE members SET photo=NULL, photo_v=photo_v+1 WHERE user_id=?').run(target); return; }
+  if (typeof dataUrl !== 'string' || dataUrl.length > PHOTO_MAX || !/^data:image\/jpeg;base64,[A-Za-z0-9+/]+={0,2}$/.test(dataUrl)) bad('Нужна фотография JPEG до 100 КБ');
+  const buf = Buffer.from(dataUrl.slice(23), 'base64');
+  if (buf.length < 200 || buf[0] !== 0xff || buf[1] !== 0xd8 || buf[2] !== 0xff) bad('Это не фотография');
+  db.prepare('UPDATE members SET photo=?, photo_v=photo_v+1 WHERE user_id=?').run(dataUrl, target);
+}
+function getPhoto(db, actor, target) {
+  const a = membership(db, actor), t = membership(db, target);
+  if (!a || !t || a.fridge_id !== t.fridge_id) throw new HttpError(404, 'нет такого участника');
+  return t.photo || null;
+}
+
+/* ---------- прочитанные новости ---------- */
+function markNewsRead(db, uid, ids) {
+  if (!Array.isArray(ids) || ids.length > 50 || ids.some((i) => typeof i !== 'string' || !/^[\w-]{1,40}$/.test(i))) bad('новости');
+  const u = getUser(db, uid);
+  let cur = [];
+  try { cur = JSON.parse(u.news_read || '[]'); } catch (e) { cur = []; }
+  const next = [...new Set([...cur, ...ids])].slice(-100);
+  db.prepare('UPDATE users SET news_read=? WHERE id=?').run(JSON.stringify(next), uid);
+  return next;
 }
 
 /* ---------- напоминания о сроках ---------- */
@@ -295,5 +375,6 @@ module.exports = {
   HttpError, DEFAULT_TPL, UNITS, CATS, checkInitData, str, qty, unit, dateOrNull,
   getUser, membership, upsertUser, ensureFridge, leaveFridge, newInvite, pendingInvite, revokeInvites, joinByToken,
   stateFor, addProducts, updateProduct, deleteProduct, renderAsk, createAsk, markAskDone,
+  displayName, calcExp, setNick, setPhoto, getPhoto, markNewsRead,
   mskNow, digestText, queueReminders
 };
