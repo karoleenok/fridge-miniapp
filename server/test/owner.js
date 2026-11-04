@@ -138,6 +138,20 @@ const findCall = (pred) => calls.find(pred);
   assert.equal((await api(K, 'POST', '/news-read', { ids: ['n-bell'] })).s, 200);
   assert.deepEqual((await api(K, 'GET', '/state')).j.me.newsRead, ['n-bell']); ok('прочитанные новости хранятся на сервере');
 
+  // расписание напоминаний через API
+  let me = (await api(K, 'GET', '/state')).j.me.notify;
+  assert.deepEqual(me.times, ['09:00']); assert.equal(me.wd, '1111111'); assert.equal(me.always, false); ok('по умолчанию: каждый день в 09:00, только если есть что-то срочное');
+  assert.equal((await api(K, 'PATCH', '/me/notify', { times: ['18:00', '09:00', '09:00'], wd: '1111100', always: true })).s, 200);
+  me = (await api(K, 'GET', '/state')).j.me.notify;
+  assert.deepEqual(me.times, ['09:00', '18:00']); assert.equal(me.time, '09:00'); assert.equal(me.wd, '1111100'); assert.equal(me.always, true); ok('расписание сохранилось: будни, два времени, режим «всегда»');
+  assert.equal((await api(K, 'PATCH', '/me/notify', { times: ['08:00', '09:00', '12:00', '18:00'] })).s, 400); ok('больше трёх времён в день отклонено');
+  assert.equal((await api(K, 'PATCH', '/me/notify', { times: [] })).s, 400); ok('пустой список времён отклонён');
+  assert.equal((await api(K, 'PATCH', '/me/notify', { times: ['25:61'] })).s, 400); ok('кривое время отклонено');
+  assert.equal((await api(K, 'PATCH', '/me/notify', { wd: '0000000' })).s, 400); ok('ни одного дня недели отклонено');
+  assert.equal((await api(K, 'PATCH', '/me/notify', { wd: 'abc' })).s, 400); ok('мусор вместо дней недели отклонён');
+  assert.equal((await api(K, 'PATCH', '/me/notify', { time: '12:30' })).s, 200);
+  me = (await api(K, 'GET', '/state')).j.me.notify; assert.deepEqual(me.times, ['12:30']); ok('старый способ (одно время) тоже работает');
+
   console.log('\nВсе ' + n + ' проверок прошли'); srv.kill(); process.exit(0);
 })().catch((e) => { console.error('✗', e); process.exit(1); });
 let db1;
