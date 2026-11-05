@@ -101,7 +101,7 @@ async function api(req, res, url) {
     db.exec('BEGIN');
     try { C.upsertUser(db, tgUser, { consent: true, canDm }); C.ensureFridge(db, tgUser.id); db.exec('COMMIT'); }
     catch (e) { db.exec('ROLLBACK'); throw e; }
-    if (!had) tellOwnerNew(tgUser.id);
+    if (!had) { tellOwnerNew(tgUser.id); welcomeNew(tgUser.id); }
     return send(res, 200, full(tgUser.id));
   }
   const u = C.getUser(db, tgUser.id);
@@ -258,8 +258,9 @@ function touchSeen(uid) {
 function tellOwnerNew(uid) {
   if (!cfg.OWNER_ID || uid === cfg.OWNER_ID) return;
   const u = C.getUser(db, uid), total = db.prepare('SELECT count(*) n FROM users WHERE consent_at IS NOT NULL').get().n;
-  enqueue(db, cfg.OWNER_ID, `Новый человек во Фридже: ${u ? u.first_name : uid}. Всего: ${total}.`, null, 'new:' + uid);
+  enqueue(db, cfg.OWNER_ID, `Новый человек во Фридже: ${u ? u.first_name : uid}${u && u.username ? ' @' + u.username : ''}. Всего: ${total}.`, null, 'new:' + uid);
 }
+function welcomeNew(uid) { try { A.queueWelcome(db, uid, cfg.PUBLIC_URL); } catch (e) { log('welcome', e.message); } }
 function adminSnapshot() {
   return {
     stats: A.stats(db),
@@ -268,7 +269,7 @@ function adminSnapshot() {
   };
 }
 
-const ownerHelp = 'Команды владельца:\n\n/send текст — собрать пост для всех. Потом можно прислать до 10 картинок.\n/stats — кто присоединился\n/note текст — записать заметку\n/notes — все заметки, их можно править\n/whoami — твой Telegram id';
+const ownerHelp = 'Команды владельца:\n\n/send текст — собрать пост для всех. Потом можно прислать до 10 картинок.\n/stats — цифры и последние присоединившиеся\n/users — все присоединившиеся с никами\n/welcome текст — приветствие для новичков (первое сообщение после старта), потом можно прислать картинки\n/note текст — записать заметку\n/notes — все заметки, их можно править\n/whoami — твой Telegram id';
 const sendHelp = 'Как отправить пост:\n\n1) /send и текст. Жирный, ссылки и курсив сохранятся.\n2) Потом пришли картинки, до 10 штук (можно альбомом).\n3) Нажми «Показать», проверь и подтверди.\n\nМожно сразу картинку с подписью, которая начинается с /send.';
 const bcKb = [[{ text: 'Показать, как увидят люди', callback_data: 'bc:show' }], [{ text: 'Отменить черновик', callback_data: 'bc:no' }]];
 const reply = (chatId, text, markup) => tg.call('sendMessage', Object.assign({ chat_id: chatId, text, link_preview_options: { is_disabled: true } }, markup ? { reply_markup: markup } : {}));
@@ -291,6 +292,16 @@ async function ownerMessage(msg) {
   if (/^\/admin/.test(raw)) { await reply(chatId, ownerHelp); return true; }
   if (/^\/stats/.test(raw)) { await reply(chatId, A.statsText(A.stats(db))); return true; }
   if (/^\/notes/.test(raw)) { await showNotes(chatId); return true; }
+  if (/^\/users/.test(raw)) { const pg = Math.max(0, (parseInt((raw.match(/^\/users(?:@\w+)?\s+(\d+)/) || [])[1], 10) || 1) - 1); const mb = A.members(db, pg); await reply(chatId, A.membersText(mb), mb.pages > 1 ? { inline_keyboard: [[...(pg > 0 ? [{ text: '← Назад', callback_data: 'us:' + (pg - 1) }] : []), ...(pg + 1 < mb.pages ? [{ text: 'Дальше →', callback_data: 'us:' + (pg + 1) }] : [])]] } : undefined); return true; }
+  if (/^\/welcome(@\w+)?\s+off\s*$/i.test(raw)) { db.prepare("UPDATE broadcasts SET state='cancelled' WHERE state='welcome'").run(); await reply(chatId, 'Приветствие выключено. Новичкам ничего не приходит.'); return true; }
+  if (/^\/welcome(@\w+)?\s*$/.test(raw) && !msg.photo) {
+    const w = A.welcome(db);
+    if (!w) { await reply(chatId, 'Приветствия пока нет. Напиши /welcome и текст, потом пришли картинки, если нужны.'); return true; }
+    await reply(chatId, 'Так сейчас видят новички:');
+    for (const r of A.postRows(w, cfg.PUBLIC_URL, true)) { const { method, body } = buildCall({ chat_id: chatId, text: r.text, markup: r.kb ? JSON.stringify(r.kb) : null, kind: r.kind, media: JSON.stringify(r.media), ents: r.ents.length ? JSON.stringify(r.ents) : null }); await tg.call(method, body); }
+    await reply(chatId, 'Заменить: /welcome и новый текст. Выключить: /welcome off');
+    return true;
+  }
   let mm = raw.match(/^\/note(?:@\w+)?\s+([\s\S]+)/);
   if (mm) { try { const id = A.notes.add(db, mm[1]); await reply(chatId, 'Записала заметку #' + id + '. Все заметки: /notes'); } catch (e) { await reply(chatId, e.message); } return true; }
   if (/^\/note(?:@\w+)?\s*$/.test(raw)) { await reply(chatId, 'Напиши заметку после команды: /note купить фильтр для воды'); return true; }
@@ -299,13 +310,14 @@ async function ownerMessage(msg) {
     try { A.notes.edit(db, editing.v, raw); await reply(chatId, 'Заметка #' + editing.v + ' обновлена.'); } catch (e) { await reply(chatId, e.message); }
     return true;
   }
-  const isSend = /^\/send(@\w+)?(\s|$)/.test(raw);
+  const isWel = /^\/welcome(@\w+)?\s/.test(raw) || (/^\/welcome(@\w+)?$/.test(raw) && !!msg.photo);
+  const isSend = isWel || /^\/send(@\w+)?(\s|$)/.test(raw);
   const d0 = A.draft(db);
   if (isSend || (msg.photo && d0)) {
     const post = A.parsePost(msg, isSend);
     if (isSend && !post.text && !post.pic) { await reply(chatId, sendHelp); return true; }
     if (!isSend && d0 && d0.text) { post.text = ''; post.ents = []; } // подпись к картинке не затирает уже написанный текст
-    const d = A.saveDraft(db, post, isSend);
+    const d = A.saveDraft(db, post, isSend, isWel ? 'welcome' : (isSend ? 'post' : (d0 ? d0.kind : 'post')));
     if (d.full) { await reply(chatId, 'В посте уже ' + A.MAX_PICS + ' картинок, больше нельзя.'); return true; }
     const gid = msg.media_group_id || '';
     if (gid && gid === lastGroup) return true; // альбом приходит по одной картинке: отвечаем один раз
@@ -318,16 +330,33 @@ async function ownerMessage(msg) {
 }
 
 async function ownerCallback(q, d, answer) {
+  let mm0;
   const chatId = q.message.chat.id, mid = q.message.message_id;
+  if ((mm0 = d.match(/^us:(\d+)$/))) {
+    const pg = Number(mm0[1]), mb = A.members(db, pg); await answer();
+    return tg.call('editMessageText', { chat_id: chatId, message_id: mid, text: A.membersText(mb), reply_markup: { inline_keyboard: [[...(pg > 0 ? [{ text: '← Назад', callback_data: 'us:' + (pg - 1) }] : []), ...(pg + 1 < mb.pages ? [{ text: 'Дальше →', callback_data: 'us:' + (pg + 1) }] : [])]] } });
+  }
+  if ((mm0 = d.match(/^bc:wel:(\d+)$/))) {
+    const b = A.draft(db);
+    if (!b || b.id !== Number(mm0[1]) || b.kind !== 'welcome') return answer('Этот черновик уже не актуален');
+    A.setWelcome(db, b.id); await answer('Готово');
+    tg.call('editMessageReplyMarkup', { chat_id: chatId, message_id: mid, reply_markup: { inline_keyboard: [] } });
+    return reply(chatId, 'Приветствие сохранено. Его получит каждый новый человек сразу после согласия. Посмотреть: /welcome');
+  }
   if (d === 'bc:show') {
     const b = A.draft(db);
     if (!b) { await answer('Черновика нет'); return reply(chatId, 'Черновика нет. Начни с /send'); }
     await answer();
-    for (const r of A.postRows(b, cfg.PUBLIC_URL)) {
+    for (const r of A.postRows(b, cfg.PUBLIC_URL, b.kind === 'welcome')) {
       const { method, body } = buildCall({ chat_id: chatId, text: r.text, markup: r.kb ? JSON.stringify(r.kb) : null, kind: r.kind, media: JSON.stringify(r.media), ents: r.ents.length ? JSON.stringify(r.ents) : null });
       await tg.call(method, body);
     }
     const chk = A.checkDraft(b), aud = A.audience(db, cfg.OWNER_ID);
+    if (b.kind === 'welcome') {
+      const L2 = ['Проверка приветствия', '', 'Текст: ' + (b.text ? b.text.length + ' знаков' : 'нет'), 'Картинок: ' + chk.media, 'Придёт каждому новому человеку сразу после согласия, если бот может ему писать.'];
+      chk.bad.forEach((x) => L2.push('⚠️ ' + x));
+      return reply(chatId, L2.join('\n'), { inline_keyboard: (chk.bad.length ? [] : [[{ text: 'Сделать приветствием', callback_data: 'bc:wel:' + b.id }]]).concat([[{ text: 'Отменить', callback_data: 'bc:no' }]]) });
+    }
     const L = ['Проверка перед отправкой', '', 'Текст: ' + (b.text ? b.text.length + ' знаков' : 'нет'), 'Картинок: ' + chk.media,
       'Получат: ' + aud.ids.length + ' ' + A.plural(aud.ids.length, 'человек', 'человека', 'человек'),
       'Не получат: ' + aud.skip + ' (не нажимали Старт или отключили рассылку)'];
@@ -408,7 +437,7 @@ async function onUpdate(up) {
       if (d === 'agree' || d.startsWith('agree:')) {
         const had = !!(C.getUser(db, uid) || {}).consent_at;
         C.upsertUser(db, q.from, { consent: true, canDm: true });
-        if (!had) tellOwnerNew(uid);
+        if (!had) { tellOwnerNew(uid); welcomeNew(uid); }
         C.ensureFridge(db, uid);
         await answer('Спасибо!');
         const payload = d.slice(6);

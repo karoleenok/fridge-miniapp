@@ -34,7 +34,7 @@ function stats(db, now = new Date()) {
     products: one('SELECT count(*) n FROM products'),
     asks: one('SELECT count(*) n FROM asks'),
     days,
-    recent: db.prepare("SELECT first_name name, substr(consent_at,1,10) d FROM users WHERE consent_at IS NOT NULL ORDER BY consent_at DESC LIMIT 10").all()
+    recent: db.prepare("SELECT first_name name, username nick, substr(consent_at,1,10) d FROM users WHERE consent_at IS NOT NULL ORDER BY consent_at DESC LIMIT 10").all()
   };
 }
 
@@ -48,7 +48,7 @@ function statsText(s) {
     `Просьб «купить»: ${s.asks}`,
     `Отказались от рассылки: ${s.newsOff}`, '', 'Кто присоединился по дням:'];
   s.days.forEach((x) => L.push(`${x.d.slice(8)}.${x.d.slice(5, 7)} — ${x.n}`));
-  if (s.recent.length) { L.push('', 'Последние:'); s.recent.forEach((r) => L.push(`${r.name || 'Без имени'}, ${r.d.slice(8)}.${r.d.slice(5, 7)}`)); }
+  if (s.recent.length) { L.push('', 'Последние:'); s.recent.forEach((r) => L.push(`${r.name || 'Без имени'}${r.nick ? ' @' + r.nick : ''}, ${r.d.slice(8)}.${r.d.slice(5, 7)}`)); L.push('', 'Все по списку: /users'); }
   return L.join('\n');
 }
 
@@ -81,7 +81,7 @@ function parsePost(msg, cutCommand) {
   let raw = String(msg.text || msg.caption || '');
   let ents = msg.entities || msg.caption_entities || [];
   let pre = 0;
-  if (cutCommand) { const m = raw.match(/^\/send(?:@\w+)?\s*/); pre = m ? m[0].length : 0; }
+  if (cutCommand) { const m = raw.match(/^\/(?:send|welcome)(?:@\w+)?\s*/); pre = m ? m[0].length : 0; }
   const text = raw.slice(pre).replace(/\s+$/, '');
   ents = ents.filter((e) => e.offset >= pre && e.offset + e.length <= pre + text.length && e.type !== 'bot_command')
     .map((e) => ({ ...e, offset: e.offset - pre }));
@@ -89,12 +89,26 @@ function parsePost(msg, cutCommand) {
   return { text, ents, pic };
 }
 
-function saveDraft(db, { text, ents, pic }, fresh) {
+// Кто присоединился: имя, @ник, дата. Страницами по 40, чтобы влезало в одно сообщение Telegram.
+const PAGE = 40;
+function members(db, page = 0) {
+  const total = db.prepare('SELECT count(*) n FROM users WHERE consent_at IS NOT NULL').get().n;
+  const rows = db.prepare('SELECT first_name name, username nick, can_dm dm, news_off off, substr(consent_at,1,10) d FROM users WHERE consent_at IS NOT NULL ORDER BY consent_at DESC LIMIT ? OFFSET ?').all(PAGE, page * PAGE);
+  return { total, rows, pages: Math.max(1, Math.ceil(total / PAGE)), page };
+}
+function membersText(m) {
+  if (!m.total) return 'Пока никто не присоединился.';
+  const L = [`Присоединились: ${m.total}` + (m.pages > 1 ? `. Страница ${m.page + 1} из ${m.pages}` : ''), ''];
+  m.rows.forEach((r, i) => L.push(`${m.page * PAGE + i + 1}. ${r.name || 'Без имени'}${r.nick ? ' @' + r.nick : ' (ника нет)'}, ${r.d.slice(8)}.${r.d.slice(5, 7)}${r.dm ? '' : ', бот писать не может'}${r.off ? ', без рассылок' : ''}`));
+  return L.join('\n');
+}
+
+function saveDraft(db, { text, ents, pic }, fresh, kind = 'post') {
   let d = fresh ? null : draft(db);
   if (!d || Date.now() - Date.parse(d.created_at.replace(' ', 'T') + 'Z') > 3600000) {
     if (d) db.prepare("UPDATE broadcasts SET state='cancelled' WHERE id=?").run(d.id);
     db.prepare("UPDATE broadcasts SET state='cancelled' WHERE state='draft'").run();
-    const id = Number(db.prepare('INSERT INTO broadcasts(text,ents,media) VALUES(?,?,?)').run(text, ents.length ? JSON.stringify(ents) : null, JSON.stringify(pic ? [pic] : [])).lastInsertRowid);
+    const id = Number(db.prepare('INSERT INTO broadcasts(text,ents,media,kind) VALUES(?,?,?,?)').run(text, ents.length ? JSON.stringify(ents) : null, JSON.stringify(pic ? [pic] : []), kind).lastInsertRowid);
     return db.prepare('SELECT * FROM broadcasts WHERE id=?').get(id);
   }
   const media = JSON.parse(d.media);
@@ -105,9 +119,9 @@ function saveDraft(db, { text, ents, pic }, fresh) {
 }
 
 // Строки для очереди: как увидит один человек. Footer добавляем в конец, чтобы форматирование не сдвинулось.
-function postRows(b, appUrl) {
+function postRows(b, appUrl, noFoot) {
   const media = JSON.parse(b.media || '[]'), ents = b.ents ? JSON.parse(b.ents) : [];
-  const text = (b.text || '') + FOOT;
+  const text = (b.text || '') + (noFoot ? '' : FOOT);
   const kb = appUrl ? { inline_keyboard: [[{ text: 'Открыть Фридж', web_app: { url: appUrl } }]] } : null;
   if (!media.length) return [{ text, ents, kb, kind: 'text', media: [] }];
   const kind = media.length === 1 ? 'photo' : 'album';
@@ -151,4 +165,21 @@ function finishSending(db) {
   return out;
 }
 
-module.exports = { CAP, MAX_PICS, FOOT, plural, draft, audience, stats, statsText, notes, noteLine, parsePost, saveDraft, postRows, checkDraft, startSending, finishSending };
+// Приветствие новичкам: один активный пост, state='welcome'. Уходит каждому, кто даёт согласие и разрешил писать.
+const welcome = (db) => db.prepare("SELECT * FROM broadcasts WHERE state='welcome' ORDER BY id DESC LIMIT 1").get();
+function setWelcome(db, id) {
+  db.exec('BEGIN');
+  try {
+    db.prepare("UPDATE broadcasts SET state='cancelled' WHERE state='welcome'").run();
+    db.prepare("UPDATE broadcasts SET state='welcome' WHERE id=? AND kind='welcome'").run(id);
+    db.exec('COMMIT');
+  } catch (e) { db.exec('ROLLBACK'); throw e; }
+}
+function queueWelcome(db, uid, appUrl) {
+  const w = welcome(db), u = db.prepare('SELECT can_dm FROM users WHERE id=?').get(uid);
+  if (!w || !u || !u.can_dm) return false;
+  postRows(w, appUrl, true).forEach((r, i) => enqueue(db, uid, r.text, r.kb, `wel:${w.id}:${uid}:${i}`, { kind: r.kind, media: r.media, ents: r.ents }));
+  return true;
+}
+
+module.exports = { members, membersText, PAGE, welcome, setWelcome, queueWelcome, CAP, MAX_PICS, FOOT, plural, draft, audience, stats, statsText, notes, noteLine, parsePost, saveDraft, postRows, checkDraft, startSending, finishSending };

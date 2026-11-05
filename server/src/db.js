@@ -125,6 +125,8 @@ function migrate(db) {
       created_at TEXT NOT NULL DEFAULT (datetime('now')), sent_at TEXT
     );
   `);
+  addCol(db, 'users', 'username', 'TEXT');           // @ник в Telegram (без @), если он есть
+  addCol(db, 'broadcasts', 'kind', "TEXT NOT NULL DEFAULT 'post'"); // post | welcome
 }
 
 module.exports = { open, migrate };

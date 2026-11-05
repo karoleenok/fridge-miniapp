@@ -103,12 +103,13 @@ const displayName = (db, uid) => {
 
 function upsertUser(db, tgUser, extra = {}) {
   const name = String(tgUser.first_name || '').slice(0, 64) || 'Без имени';
+  const nick = /^[A-Za-z0-9_]{3,32}$/.test(String(tgUser.username || '')) ? String(tgUser.username) : null;
   const u = getUser(db, tgUser.id);
   if (!u) {
-    db.prepare('INSERT INTO users(id,first_name,can_dm,consent_at) VALUES(?,?,?,?)')
-      .run(tgUser.id, name, extra.canDm ? 1 : 0, extra.consent ? new Date().toISOString() : null);
+    db.prepare('INSERT INTO users(id,first_name,can_dm,consent_at,username) VALUES(?,?,?,?,?)')
+      .run(tgUser.id, name, extra.canDm ? 1 : 0, extra.consent ? new Date().toISOString() : null, nick);
   } else {
-    db.prepare('UPDATE users SET first_name=? WHERE id=?').run(name, tgUser.id);
+    db.prepare('UPDATE users SET first_name=?, username=? WHERE id=?').run(name, nick, tgUser.id);
     if (extra.canDm) db.prepare('UPDATE users SET can_dm=1 WHERE id=?').run(tgUser.id);
     if (extra.consent && !u.consent_at) db.prepare('UPDATE users SET consent_at=? WHERE id=?').run(new Date().toISOString(), tgUser.id);
   }
