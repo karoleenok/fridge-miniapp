@@ -44,8 +44,17 @@ const str = (v, max, name, required = true) => {
 };
 const qty = (v) => { const n = Number(v); if (!Number.isFinite(n) || n <= 0 || n > 100000) bad('количество'); return Math.round(n * 100) / 100; };
 const unit = (v) => (UNITS.includes(v) ? v : bad('единица'));
-const cat = (v) => (CATS.includes(v) ? v : 'other');
-const emoji = (v) => (typeof v === 'string' && v.length > 0 && v.length <= 8 ? v : '📦');
+const CAT_ID = /^u[a-z0-9]{1,11}$/;
+const COLOR = /^(#[0-9A-Fa-f]{6}|[a-z][a-z0-9_-]{0,15})$/;
+const colorOrNull = (v) => (v == null || v === '' ? null : typeof v === 'string' && COLOR.test(v) ? v : bad('цвет'));
+// своя категория должна существовать в этом холодильнике, иначе «Другое»
+const cat = (v, db, fid) => {
+  if (CATS.includes(v)) return v;
+  if (db && typeof v === 'string' && CAT_ID.test(v) && db.prepare('SELECT 1 FROM cats WHERE fridge_id=? AND id=?').get(fid, v)) return v;
+  return 'other';
+};
+const MARKUP = /[<>&"'`]/; // в названиях и значках разметке не место: клиент вставляет их в страницу
+const emoji = (v) => (typeof v === 'string' && v.length > 0 && v.length <= 8 && !MARKUP.test(v) ? v : '📦');
 const dateOrNull = (v) => {
   if (v == null || v === '') return null;
   if (typeof v !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(v) || isNaN(Date.parse(v + 'T00:00:00Z'))) bad('дата');
@@ -178,7 +187,8 @@ function stateFor(db, uid) {
   const f = db.prepare('SELECT * FROM fridges WHERE id=?').get(fid);
   const members = db.prepare(`SELECT m.user_id id, m.role, u.first_name name, u.can_dm, m.nick, m.photo_v, m.photo IS NOT NULL has_photo
     FROM members m JOIN users u ON u.id=m.user_id WHERE m.fridge_id=? ORDER BY m.role='owner' DESC, m.joined_at`).all(fid);
-  const products = db.prepare('SELECT id,name,e,c,exp,made,shelf_n sn,shelf_u su,q,u,added_by,added FROM products WHERE fridge_id=? ORDER BY id').all(fid);
+  const products = db.prepare('SELECT id,name,e,c,col,fz,exp,made,shelf_n sn,shelf_u su,q,u,added_by,added FROM products WHERE fridge_id=? ORDER BY id').all(fid).map((p) => ({ ...p, fz: !!p.fz }));
+  const cats = db.prepare('SELECT id,name n,short s,emoji e,col,mode FROM cats WHERE fridge_id=? ORDER BY rowid').all(fid);
   const asks = db.prepare(`SELECT * FROM (
       SELECT id,from_id,to_ids,name,q,u,note,done,done_by,created_at FROM asks WHERE fridge_id=? AND done=0
       UNION ALL SELECT * FROM (SELECT id,from_id,to_ids,name,q,u,note,done,done_by,created_at FROM asks WHERE fridge_id=? AND done=1 ORDER BY id DESC LIMIT 10)
@@ -187,10 +197,11 @@ function stateFor(db, uid) {
   return {
     me: { id: uid, name: displayName(db, uid), canDm: !!u.can_dm, onboarded: !!u.onboarded,
       newsRead: (() => { try { return JSON.parse(u.news_read || '[]'); } catch (e) { return []; } })(),
-      notify: { on: !!u.notify_on, days: u.notify_days, time: u.notify_time, times: notifyTimes(u), wd: u.notify_wd || '1111111', always: !!u.notify_always } },
+      notify: { on: !!u.notify_on, days: u.notify_days, time: u.notify_time, times: notifyTimes(u), wd: u.notify_wd || '1111111', always: !!u.notify_always, fzdays: u.notify_fz_days || 14 },
+      myCols: (() => { try { const a = JSON.parse(u.my_cols || '[]'); return Array.isArray(a) ? a : []; } catch (e) { return []; } })() },
     fridge: { id: fid, name: f.name, tpl: f.tpl || DEFAULT_TPL, ownerId: f.owner_id },
     members: members.map((m) => ({ id: m.id, name: m.nick || m.name, tgName: m.name, nick: m.nick || '', role: m.role, bot: !!m.can_dm, photoV: m.has_photo ? m.photo_v : 0 })),
-    products, asks,
+    products, cats, asks,
     invite: inv ? { token: inv.token, expiresAt: inv.expires_at } : null
   };
 }
@@ -201,19 +212,57 @@ function addProducts(db, uid, list) {
   const fid = ensureFridge(db, uid);
   const count = db.prepare('SELECT count(*) n FROM products WHERE fridge_id=?').get(fid).n;
   if (count + list.length > 500) bad('слишком много продуктов в холодильнике');
-  const ins = db.prepare('INSERT INTO products(fridge_id,name,e,c,exp,made,shelf_n,shelf_u,q,u,added_by,added) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)');
+  const ins = db.prepare('INSERT INTO products(fridge_id,name,e,c,col,fz,exp,made,shelf_n,shelf_u,q,u,added_by,added) VALUES(?,?,?,?,?,?,?,?,?,?,?,?,?,?)');
   const today = new Date().toISOString().slice(0, 10);
   const ids = [];
   db.exec('BEGIN');
   try {
     for (const p of list) {
       const sh = shelfFields(p, null);
-      const r = ins.run(fid, str(p.name, 40, 'название'), emoji(p.e), cat(p.c), sh.exp, sh.made, sh.sn, sh.su, qty(p.q), unit(p.u), uid, today);
+      const r = ins.run(fid, str(p.name, 40, 'название'), emoji(p.e), cat(p.c, db, fid), colorOrNull(p.col), p.fz ? 1 : 0, sh.exp, sh.made, sh.sn, sh.su, qty(p.q), unit(p.u), uid, today);
       ids.push(Number(r.lastInsertRowid));
     }
     db.exec('COMMIT');
   } catch (e) { db.exec('ROLLBACK'); throw e; }
   return ids;
+}
+
+
+/* ---------- свои категории ---------- */
+const MAX_CATS = 30;
+function catFields(b) {
+  const mode = ['letter', 'emoji', 'color'].includes(b.mode) ? b.mode : 'letter';
+  const name = str(b.n, 24, 'название категории');
+  const emo = mode === 'emoji' ? str(b.e, 8, 'эмодзи') : '';
+  if (MARKUP.test(name) || MARKUP.test(emo) || MARKUP.test(String(b.s || ''))) bad('название: недопустимые символы');
+  return { name, short: str(b.s || (name.length > 14 ? name.slice(0, 13) + '…' : name), 15, 'короткое название'), emoji: emo, col: colorOrNull(b.col) || bad('цвет'), mode };
+}
+function addCat(db, uid, b) {
+  const fid = ensureFridge(db, uid);
+  if (typeof b.id !== 'string' || !CAT_ID.test(b.id)) bad('id категории');
+  const f = catFields(b);
+  if (db.prepare('SELECT count(*) n FROM cats WHERE fridge_id=?').get(fid).n >= MAX_CATS) bad('слишком много своих категорий');
+  db.prepare('INSERT OR REPLACE INTO cats(fridge_id,id,name,short,emoji,col,mode) VALUES(?,?,?,?,?,?,?)').run(fid, b.id, f.name, f.short, f.emoji, f.col, f.mode);
+}
+function updateCat(db, uid, id, b) {
+  const fid = ensureFridge(db, uid);
+  const c = db.prepare('SELECT * FROM cats WHERE fridge_id=? AND id=?').get(fid, id);
+  if (!c) throw new HttpError(404, 'нет такой категории');
+  const f = catFields({ n: b.n ?? c.name, s: b.s ?? c.short, e: b.e ?? c.emoji, col: b.col ?? c.col, mode: b.mode ?? c.mode });
+  db.prepare('UPDATE cats SET name=?,short=?,emoji=?,col=?,mode=? WHERE fridge_id=? AND id=?').run(f.name, f.short, f.emoji, f.col, f.mode, fid, id);
+}
+function deleteCat(db, uid, id) {
+  const fid = ensureFridge(db, uid);
+  db.exec('BEGIN');
+  try {
+    db.prepare("UPDATE products SET c='other' WHERE fridge_id=? AND c=?").run(fid, id);
+    db.prepare('DELETE FROM cats WHERE fridge_id=? AND id=?').run(fid, id);
+    db.exec('COMMIT');
+  } catch (e) { db.exec('ROLLBACK'); throw e; }
+}
+function setMyCols(db, uid, list) {
+  if (!Array.isArray(list) || list.length > 12 || list.some((h) => typeof h !== 'string' || !/^#[0-9A-Fa-f]{6}$/.test(h))) bad('цвета');
+  db.prepare('UPDATE users SET my_cols=? WHERE id=?').run(JSON.stringify([...new Set(list.map((h) => h.toUpperCase()))]), uid);
 }
 
 function ownProduct(db, uid, id) {
@@ -228,12 +277,14 @@ function updateProduct(db, uid, id, b) {
   const n = {
     name: b.name !== undefined ? str(b.name, 40, 'название') : p.name,
     e: b.e !== undefined ? emoji(b.e) : p.e,
-    c: b.c !== undefined ? cat(b.c) : p.c,
+    c: b.c !== undefined ? cat(b.c, db, p.fridge_id) : p.c,
+    col: b.col !== undefined ? colorOrNull(b.col) : p.col,
+    fz: b.fz !== undefined ? (b.fz ? 1 : 0) : p.fz,
     ...(() => { const sh = shelfFields(b, p); return { exp: sh.exp, made: sh.made, sn: sh.sn, su: sh.su }; })(),
     q: b.q !== undefined ? qty(b.q) : p.q,
     u: b.u !== undefined ? unit(b.u) : p.u
   };
-  db.prepare('UPDATE products SET name=?,e=?,c=?,exp=?,made=?,shelf_n=?,shelf_u=?,q=?,u=? WHERE id=?').run(n.name, n.e, n.c, n.exp, n.made, n.sn, n.su, n.q, n.u, p.id);
+  db.prepare('UPDATE products SET name=?,e=?,c=?,col=?,fz=?,exp=?,made=?,shelf_n=?,shelf_u=?,q=?,u=? WHERE id=?').run(n.name, n.e, n.c, n.col, n.fz, n.exp, n.made, n.sn, n.su, n.q, n.u, p.id);
 }
 
 function deleteProduct(db, uid, id) {
@@ -251,11 +302,14 @@ function renderAsk(tpl, from, name, q, u, note) {
 function createAsk(db, uid, b, cfg) {
   const m = membership(db, uid);
   if (!m) bad('нет холодильника');
-  const recent = db.prepare("SELECT count(*) n FROM asks WHERE from_id=? AND created_at>datetime('now','-1 hour')").get(uid).n;
+  // лимит «20 в час» защищает людей от спама, личный список (без получателей) в него не входит
+  const recent = db.prepare("SELECT count(*) n FROM asks WHERE from_id=? AND to_ids<>'[]' AND created_at>datetime('now','-1 hour')").get(uid).n;
   if (recent >= ASKS_PER_HOUR) throw new HttpError(429, 'Слишком много просьб за час. Попробуй позже.');
   const memberIds = db.prepare('SELECT user_id FROM members WHERE fridge_id=?').all(m.fridge_id).map((r) => r.user_id);
   const to = Array.isArray(b.to) ? [...new Set(b.to.map(Number))] : [];
-  if (!to.length || to.some((id) => id === uid || !memberIds.includes(id))) bad('кому');
+  if (db.prepare('SELECT count(*) n FROM asks WHERE fridge_id=? AND done=0').get(m.fridge_id).n >= 300) bad('в списке покупок уже 300 пунктов, отметь купленное');
+  // пустой список получателей — личный список покупок: просьба сохраняется, сообщений никому нет
+  if (to.some((id) => id === uid || !memberIds.includes(id))) bad('кому');
   const name = str(b.name, 40, 'что купить'), q = qty(b.q), u = unit(b.u), note = str(b.note, 140, 'комментарий', false);
   const r = db.prepare('INSERT INTO asks(fridge_id,from_id,to_ids,name,q,u,note) VALUES(?,?,?,?,?,?,?)')
     .run(m.fridge_id, uid, JSON.stringify(to), name, q, u, note);
@@ -342,14 +396,22 @@ function mskNow(tz, d = new Date()) {
 const dayDiff = (a, b) => Math.round((Date.parse(a + 'T00:00:00Z') - Date.parse(b + 'T00:00:00Z')) / 86400000);
 const plural = (n, a, b, c) => { const m = n % 10, h = n % 100; return m === 1 && h !== 11 ? a : m >= 2 && m <= 4 && (h < 10 || h >= 20) ? b : c; };
 
-function digestText(products, today, days) {
-  const list = products.filter((p) => p.exp && dayDiff(p.exp, today) <= days).sort((a, b) => (a.exp < b.exp ? -1 : 1));
+// Морозилка: окно своё (по умолчанию 14 дней), и «срок вышел» там не тревога: при −18 °C еда безопасна, срок про качество.
+function digestText(products, today, days, fzDays = 14) {
+  const warn = (p) => (p.fz ? fzDays : days);
+  const list = products.filter((p) => p.exp && dayDiff(p.exp, today) <= warn(p)).sort((a, b) => (a.exp < b.exp ? -1 : 1));
   if (!list.length) return null;
-  const over = list.filter((p) => dayDiff(p.exp, today) < 0), soon = list.filter((p) => dayDiff(p.exp, today) >= 0);
+  const fzList = list.filter((p) => p.fz);
+  const reg = list.filter((p) => !p.fz);
+  const over = reg.filter((p) => dayDiff(p.exp, today) < 0), soon = reg.filter((p) => dayDiff(p.exp, today) >= 0);
   const when = (p) => { const d = dayDiff(p.exp, today); return d === 0 ? 'сегодня' : d === 1 ? 'завтра' : `через ${d} ${plural(d, 'день', 'дня', 'дней')}`; };
   let s = '';
   if (over.length) s += 'Просрочено, проверь:\n' + over.slice(0, 5).map((p) => `${p.e} ${p.name}`).join('\n') + '\n\n';
   if (soon.length) s += 'Скоро испортится:\n' + soon.slice(0, 6).map((p) => `${p.e} ${p.name}, ${when(p)}`).join('\n') + (soon.length > 6 ? `\nи ещё ${soon.length - 6}` : '');
+  if (fzList.length) {
+    const span = (p) => { const d = dayDiff(p.exp, today); return d < 0 ? 'срок вышел' : d === 0 ? 'сегодня' : d === 1 ? 'завтра' : d < 45 ? `через ${d} ${plural(d, 'день', 'дня', 'дней')}` : d < 84 ? `через ${Math.round(d / 7)} нед` : `через ${Math.round(d / 30.4)} мес`; };
+    s += (s ? '\n\n' : '') + 'В морозилке пора доесть:\n' + fzList.slice(0, 5).map((p) => `${p.e} ${p.name}, ${span(p)}`).join('\n') + (fzList.length > 5 ? `\nи ещё ${fzList.length - 5}` : '');
+  }
   return s.trim();
 }
 
@@ -371,8 +433,8 @@ function queueReminders(db, cfg, d = new Date()) {
       const [h, mi] = t.split(':').map(Number), [nh, nm] = now.time.split(':').map(Number);
       const diff = nh * 60 + nm - (h * 60 + mi);
       if (diff < 0 || diff > 180) continue;
-      const products = db.prepare('SELECT name,e,exp FROM products WHERE fridge_id=? AND exp IS NOT NULL').all(u.fridge_id);
-      const text = digestText(products, now.date, u.notify_days) || (u.notify_always ? calmText(u.notify_days) : null);
+      const products = db.prepare('SELECT name,e,exp,fz FROM products WHERE fridge_id=? AND exp IS NOT NULL').all(u.fridge_id);
+      const text = digestText(products, now.date, u.notify_days, u.notify_fz_days || 14) || (u.notify_always ? calmText(u.notify_days) : null);
       if (!text) continue;
       const kb = cfg.PUBLIC_URL ? { inline_keyboard: [[{ text: 'Открыть Фридж', web_app: { url: cfg.PUBLIC_URL } }]] } : null;
       if (enqueue(db, u.id, text, kb, `rem:${u.id}:${now.date}:${t}`)) { n++; break; } // за один проход — одно сообщение человеку
@@ -384,7 +446,7 @@ function queueReminders(db, cfg, d = new Date()) {
 module.exports = {
   HttpError, DEFAULT_TPL, UNITS, CATS, checkInitData, str, qty, unit, dateOrNull,
   getUser, membership, upsertUser, ensureFridge, leaveFridge, newInvite, pendingInvite, revokeInvites, joinByToken,
-  stateFor, addProducts, updateProduct, deleteProduct, renderAsk, createAsk, markAskDone,
+  stateFor, addProducts, updateProduct, deleteProduct, addCat, updateCat, deleteCat, setMyCols, renderAsk, createAsk, markAskDone,
   displayName, calcExp, setNick, setPhoto, getPhoto, markNewsRead,
   mskNow, digestText, queueReminders, notifyTimes
 };

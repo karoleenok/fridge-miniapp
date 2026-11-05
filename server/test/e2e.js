@@ -98,6 +98,8 @@ async function until(fn, ms = 15000) { const t = Date.now(); while (Date.now() -
   await pg.click('.nav [data-tab=buy]');
   await pg.click('[data-act=ask-open]');
   await pg.click('[data-act=ask-pick][data-n="Молоко"]');
+  await pg.click('[data-act=ask-who]:has-text("Маша")'); // в v1.3 по умолчанию выбрано «Себе»
+  await pg.click('[data-act=ask-who][data-id=me]');
   await pg.fill('#askNote', 'С зелёной крышкой');
   await pg.screenshot({ path: path.join(shots, 'e7-ask.png') });
   await pg.click('#askSend');
@@ -111,6 +113,7 @@ async function until(fn, ms = 15000) { const t = Date.now(); while (Date.now() -
   // удаление продукта и отмена
   await pg.click('.nav [data-tab=products]');
   const before = await pg.evaluate('__fridge.state().products.length');
+  if (await pg.locator('#secAll:not([hidden])').count()) await pg.click('#secAll'); // разделы свёрнуты, раскрываем все
   await pg.click('.row >> nth=0'); await pg.click('[data-act=eat]'); await wait(500);
   await pg.click('[data-act=toast-act]'); await wait(800);
   await pg.reload(); await pg.waitForSelector('#main:not([hidden])');

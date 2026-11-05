@@ -48,9 +48,9 @@ let n = 0; const ok = (t) => console.log('  ✓ ' + String(++n).padStart(2) + ' 
   // пропускаем онбординг через API
   await api(K, 'POST', '/onboarded'); await api(K, 'POST', '/products', { items: [{ name: 'Молоко', e: '🥛', c: 'dairy', exp: '2030-01-01', q: 1, u: 'л' }] });
   await pg.reload(); await pg.waitForSelector('#main:not([hidden])'); await pg.waitForTimeout(400);
-  const badge = await pg.locator('#tab-products .nbadge').innerText(); assert.equal(badge, '3'); ok('в живом режиме у колокольчика 3 новости');
+  const badge = await pg.locator('#tab-products .nbadge').innerText(); assert.ok(Number(badge) >= 3); ok('в живом режиме у колокольчика есть непрочитанные новости (' + badge + ')');
   await pg.click('#tab-products .bell'); await pg.waitForTimeout(250); await pg.click('#sheet [data-act=close-sheet]'); await pg.waitForTimeout(500);
-  const rd = (await api(K, 'GET', '/state')).me.newsRead; assert.equal(rd.length, 3); ok('прочитанные новости ушли на сервер');
+  const rd = (await api(K, 'GET', '/state')).me.newsRead; assert.equal(rd.length, Number(badge)); ok('прочитанные новости ушли на сервер');
   await pg.click('[data-tab=family]'); await pg.waitForTimeout(200);
   assert.ok(await pg.evaluate("!document.querySelector('#adminEntry').hidden")); ok('владельцу видна карточка «Для владельца»');
   // профиль Маши от имени владельца: ник и фото

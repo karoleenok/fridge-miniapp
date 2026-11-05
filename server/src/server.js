@@ -149,7 +149,9 @@ async function api(req, res, url) {
       wd = body.wd;
     }
     const always = body.always === undefined ? u.notify_always : body.always ? 1 : 0;
-    db.prepare('UPDATE users SET notify_on=?, notify_days=?, notify_time=?, notify_times=?, notify_wd=?, notify_always=? WHERE id=?').run(on, days, time, times, wd, always, uid);
+    const fzdays = body.fzdays === undefined ? (u.notify_fz_days || 14) : [7, 14, 30].includes(Number(body.fzdays)) ? Number(body.fzdays) : 0;
+    if (!fzdays) throw new C.HttpError(400, 'дни для морозилки');
+    db.prepare('UPDATE users SET notify_on=?, notify_days=?, notify_time=?, notify_times=?, notify_wd=?, notify_always=?, notify_fz_days=? WHERE id=?').run(on, days, time, times, wd, always, fzdays, uid);
     return send(res, 200, { ok: true });
   }
   if (m === 'POST' && p === '/invite') {
@@ -198,6 +200,12 @@ async function api(req, res, url) {
     return send(res, 200, full(uid));
   }
   if (m === 'POST' && p === '/asks') return send(res, 200, C.createAsk(db, uid, body, cfg));
+  if (m === 'POST' && p === '/cats') { C.addCat(db, uid, body); return send(res, 200, { ok: true }); }
+  if ((mm = p.match(/^\/cats\/(u[a-z0-9]{1,11})$/))) {
+    if (m === 'PATCH') { C.updateCat(db, uid, mm[1], body); return send(res, 200, { ok: true }); }
+    if (m === 'DELETE') { C.deleteCat(db, uid, mm[1]); return send(res, 200, { ok: true }); }
+  }
+  if (m === 'PUT' && p === '/me/cols') { C.setMyCols(db, uid, body.cols); return send(res, 200, { ok: true }); }
   if ((mm = p.match(/^\/asks\/(\d+)\/done$/)) && m === 'POST') { C.markAskDone(db, uid, mm[1]); return send(res, 200, { ok: true }); }
   if (m === 'DELETE' && p === '/me') {
     // Удалить свои данные: выходим из холодильника, стираем себя. Продукты общего холодильника остаются у семьи.

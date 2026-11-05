@@ -88,6 +88,10 @@ function migrate(db) {
   addCol(db, 'products', 'made', 'TEXT');            // дата производства
   addCol(db, 'products', 'shelf_n', 'INTEGER');      // срок годности: число
   addCol(db, 'products', 'shelf_u', 'TEXT');         // срок годности: единица (д, нед, мес, год)
+  addCol(db, 'products', 'fz', 'INTEGER NOT NULL DEFAULT 0'); // 1 — лежит в морозилке
+  addCol(db, 'products', 'col', 'TEXT');             // цвет плашки: id из палитры или #RRGGBB
+  addCol(db, 'users', 'notify_fz_days', 'INTEGER NOT NULL DEFAULT 14'); // за сколько дней предупреждать о морозилке
+  addCol(db, 'users', 'my_cols', 'TEXT');            // «Мои цвета»: JSON-массив #RRGGBB, до 12 штук
   addCol(db, 'users', 'news_read', 'TEXT');          // какие новости уже прочитаны (JSON)
   addCol(db, 'users', 'news_off', 'INTEGER NOT NULL DEFAULT 0'); // отказался от рассылки владельца (/news)
   addCol(db, 'users', 'notify_wd', "TEXT NOT NULL DEFAULT '1111111'"); // дни недели напоминаний, с понедельника: 1 — писать
@@ -98,6 +102,15 @@ function migrate(db) {
   addCol(db, 'outbox', 'media', 'TEXT');             // file_id картинок (JSON)
   addCol(db, 'outbox', 'ents', 'TEXT');              // форматирование текста (JSON)
   db.exec(`
+    CREATE TABLE IF NOT EXISTS cats(
+      fridge_id INTEGER NOT NULL REFERENCES fridges(id) ON DELETE CASCADE,
+      id TEXT NOT NULL,                  -- 'u' + 1–11 символов [a-z0-9], придумывает клиент
+      name TEXT NOT NULL, short TEXT NOT NULL,
+      emoji TEXT NOT NULL DEFAULT '',
+      col TEXT NOT NULL,                 -- id из палитры или #RRGGBB
+      mode TEXT NOT NULL DEFAULT 'letter', -- letter | emoji | color
+      PRIMARY KEY(fridge_id,id)
+    );
     CREATE TABLE IF NOT EXISTS notes(
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       text TEXT NOT NULL,
